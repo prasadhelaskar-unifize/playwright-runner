@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Unifize Test Runner</title>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+  <div class="titlebar"><span class="titlebar-title">Unifize Test Runner</span></div>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-dot"></div><span>Unifize QA</span></div>
+      <nav class="nav">
+        <button class="nav-item active" data-view="home"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/></svg>Home</button>
+        <button class="nav-item" data-view="run"><svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>Run Tests</button>
+        <button class="nav-item" data-view="git"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><line x1="12" y1="7" x2="12" y2="13"/><line x1="12" y1="13" x2="5" y2="17"/><line x1="12" y1="13" x2="19" y2="17"/></svg>Git</button>
+        <button class="nav-item" data-view="report"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>Report</button>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="branch-badge" id="currentBranch">Loading…</div>
+        <div class="repo-path" id="repoPath" title="Click to change repo folder">📁 …</div>
+        <button class="btn-change-repo" id="changeRepo">Change Repo</button>
+      </div>
+    </aside>
+
+    <main class="content">
+      <!-- HOME -->
+      <section class="view active" id="view-home">
+        <h1 class="view-title">Welcome</h1>
+        <p class="view-sub">Choose an action to get started</p>
+        <div class="card-grid">
+          <div class="card" data-goto="run"><div class="card-icon green">▶</div><div class="card-label">Run Tests</div><div class="card-desc">Configure and run Playwright tests</div></div>
+          <div class="card" data-goto="git"><div class="card-icon blue">⎇</div><div class="card-label">Pull Code</div><div class="card-desc">Switch branch &amp; sync from upstream</div></div>
+          <div class="card" data-goto="report"><div class="card-icon purple">📊</div><div class="card-label">Open Report</div><div class="card-desc">View the latest Playwright test report</div></div>
+        </div>
+      </section>
+
+      <!-- RUN TESTS -->
+      <section class="view" id="view-run">
+        <div class="wizard" id="wizard">
+          <!-- Step 1 -->
+          <div class="step active" id="step-1">
+            <div class="step-header"><span class="step-badge">1 / 6</span><h2>Environment</h2></div>
+            <div class="option-group" id="env-options">
+              <button class="option-btn active" data-value="prod"><span class="opt-title">Production</span><span class="opt-sub">app.unifize.com</span></button>
+              <button class="option-btn" data-value="staging"><span class="opt-title">Staging</span><span class="opt-sub">staging.unifize.com</span></button>
+            </div>
+            <div class="step-actions"><button class="btn-next" id="env-next">Next →</button></div>
+          </div>
+          <!-- Step 2 -->
+          <div class="step" id="step-2">
+            <div class="step-header"><span class="step-badge">2 / 6</span><h2>Branch</h2><span class="current-branch-label" id="step2-current"></span></div>
+            <div class="option-group" id="branch-options">
+              <button class="option-btn" data-value="shenoy-CI-Branch"><span class="opt-title">shenoy-CI-Branch</span></button>
+              <button class="option-btn" data-value="Prasad-CI"><span class="opt-title">Prasad-CI</span></button>
+              <button class="option-btn" data-value="saransh-complete"><span class="opt-title">saransh-complete</span></button>
+              <button class="option-btn" data-value="__current__"><span class="opt-title">Stay on current</span><span class="opt-sub" id="stay-label"></span></button>
+            </div>
+            <div class="step-actions"><button class="btn-back" id="branch-back">← Back</button><button class="btn-next" id="branch-next">Next →</button></div>
+            <div class="git-status" id="branch-status"></div>
+          </div>
+          <!-- Step 3 -->
+          <div class="step" id="step-3">
+            <div class="step-header"><span class="step-badge">3 / 6</span><h2>Module / Folder</h2></div>
+            <div class="search-wrap">
+              <span class="search-icon">🔍</span>
+              <input class="search-input" id="folder-search" type="text" placeholder="Search folders or spec files…" autocomplete="off"/>
+              <button class="search-clear" id="folder-search-clear" style="display:none">✕</button>
+            </div>
+            <div class="folder-list" id="folder-list"></div>
+            <div class="step-actions"><button class="btn-back" id="folder-back">← Back</button><button class="btn-next" id="folder-next">Next →</button></div>
+          </div>
+          <!-- Step 4 -->
+          <div class="step" id="step-4">
+            <div class="step-header">
+              <span class="step-badge">4 / 6</span><h2>Spec Files</h2>
+              <span class="hint">Double-click to select &amp; continue · Cmd+click multi-select</span>
+            </div>
+            <div class="search-wrap">
+              <span class="search-icon">🔍</span>
+              <input class="search-input" id="spec-search" type="text" placeholder="Search by spec name or folder…" autocomplete="off"/>
+              <button class="search-clear" id="spec-search-clear" style="display:none">✕</button>
+            </div>
+            <div class="spec-list" id="spec-list"></div>
+            <div class="step-actions"><button class="btn-back" id="spec-back">← Back</button><button class="btn-next" id="spec-next">Next →</button></div>
+          </div>
+          <!-- Step 5 -->
+          <div class="step" id="step-5">
+            <div class="step-header"><span class="step-badge">5 / 6</span><h2>Browser Mode</h2></div>
+            <div class="option-group" id="browser-options">
+              <button class="option-btn active" data-value="headless"><span class="opt-title">Headless</span><span class="opt-sub">Faster, no visible window</span></button>
+              <button class="option-btn" data-value="headed"><span class="opt-title">Headed</span><span class="opt-sub">Shows the browser</span></button>
+              <button class="option-btn" data-value="debug"><span class="opt-title">Debug</span><span class="opt-sub">Headed + Playwright inspector</span></button>
+            </div>
+            <div class="step-actions"><button class="btn-back" id="browser-back">← Back</button><button class="btn-next" id="browser-next">Next →</button></div>
+          </div>
+          <!-- Step 6 -->
+          <div class="step" id="step-6">
+            <div class="step-header"><span class="step-badge">6 / 6</span><h2>Workers &amp; Retries</h2></div>
+            <div class="two-col">
+              <div><label class="field-label">Parallel Workers</label>
+                <div class="option-group" id="worker-options">
+                  <button class="option-btn" data-value="1"><span class="opt-title">1</span><span class="opt-sub">Sequential</span></button>
+                  <button class="option-btn active" data-value="2"><span class="opt-title">2</span><span class="opt-sub">Light</span></button>
+                  <button class="option-btn" data-value="4"><span class="opt-title">4</span><span class="opt-sub">Moderate</span></button>
+                </div>
+              </div>
+              <div><label class="field-label">Retries on Failure</label>
+                <div class="option-group" id="retry-options">
+                  <button class="option-btn active" data-value="0"><span class="opt-title">0</span><span class="opt-sub">None</span></button>
+                  <button class="option-btn" data-value="1"><span class="opt-title">1</span><span class="opt-sub">Once</span></button>
+                  <button class="option-btn" data-value="2"><span class="opt-title">2</span><span class="opt-sub">Twice</span></button>
+                </div>
+              </div>
+            </div>
+            <div class="step-actions"><button class="btn-back" id="workers-back">← Back</button><button class="btn-run" id="run-btn">▶ Run Tests</button></div>
+          </div>
+        </div>
+
+        <!-- Terminal -->
+        <div class="terminal-panel" id="terminal-panel" style="display:none">
+          <div class="terminal-header">
+            <span id="terminal-title">Running tests…</span>
+            <div class="terminal-actions">
+              <button class="btn-stop" id="stop-btn">■ Stop</button>
+              <button class="btn-sm" id="back-to-config">← Configure</button>
+            </div>
+          </div>
+          <div class="terminal" id="terminal-output"></div>
+          <div class="terminal-footer" id="terminal-footer" style="display:none">
+            <div id="run-summary"></div>
+            <button class="btn-report" id="open-report-btn">Open Report →</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- GIT -->
+      <section class="view" id="view-git">
+        <h1 class="view-title">Git — Switch &amp; Sync</h1>
+        <p class="view-sub">Select a branch to fetch and hard-reset to upstream</p>
+        <div class="branch-list">
+          <button class="branch-row" data-branch="shenoy-CI-Branch"><span class="branch-name">shenoy-CI-Branch</span><span class="branch-arrow">→</span></button>
+          <button class="branch-row" data-branch="Prasad-CI"><span class="branch-name">Prasad-CI</span><span class="branch-arrow">→</span></button>
+          <button class="branch-row" data-branch="saransh-complete"><span class="branch-name">saransh-complete</span><span class="branch-arrow">→</span></button>
+          <button class="branch-row" data-branch="__current__"><span class="branch-name">Stay on current</span><span class="branch-arrow">→</span></button>
+        </div>
+        <div class="git-log" id="git-log" style="display:none"></div>
+      </section>
+
+      <!-- REPORT -->
+      <section class="view" id="view-report">
+        <h1 class="view-title">Test Report</h1>
+        <p class="view-sub">Latest Playwright HTML report</p>
+        <div class="report-card">
+          <div class="report-icon">📊</div>
+          <div id="report-path-label">Searching for report…</div>
+          <button class="btn-open-report" id="open-report-page" style="display:none">Open in Browser →</button>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

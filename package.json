@@ -1,0 +1,51 @@
+{
+  "name": "unifize-test-runner",
+  "version": "1.0.0",
+  "description": "Unifize Playwright Test Runner",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --mac"
+  },
+  "author": "Unifize QA",
+  "dependencies": {
+    "ansi-to-html": "^0.7.2"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "com.unifize.test-runner",
+    "productName": "Unifize Test Runner",
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.icns"
+    },
+    "dmg": {
+      "title": "Unifize Test Runner",
+      "window": {
+        "width": 540,
+        "height": 380
+      }
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "assets/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    }
+  }
+}
