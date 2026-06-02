@@ -41,7 +41,7 @@ These must already be installed on the machine **before** running the app:
 2. Open the DMG and drag **Unifize Test Runner** into your **Applications** folder.
 3. On first launch, macOS Gatekeeper may block the app (unsigned build).
   To bypass: **right-click → Open → Open in Terminal** in the dialog.
-4. Use Commane  ```xattr -dr com.apple.quarantine "Unifize Test Runner.app```
+4. Use Command  ```xattr -dr com.apple.quarantine "Unifize Test Runner.app```
 5. On first launch, a folder picker appears — select your `playwright-tests` repo folder. The path is saved to `~/.unifize-test-runner.conf` and reused on every future launch.
 
 ---
