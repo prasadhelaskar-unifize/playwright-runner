@@ -1,8 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 // ── FIX 5: Input validation at the bridge boundary ───────────
-const VALID_BRANCH = /^[a-zA-Z0-9._\-/]+$/;
-const VALID_ENV    = ['prod', 'staging'];
+const VALID_BRANCH    = /^[a-zA-Z0-9._\-/]+$/;
+const VALID_ENV       = ['prod', 'staging'];
+const VALID_REPORTERS = ['default', 'line', 'dot', 'list'];
 
 function assertString(v, maxLen = 500) {
   if (typeof v !== 'string' || v.length > maxLen) throw new Error('Invalid string input');
@@ -44,19 +45,20 @@ contextBridge.exposeInMainWorld('api', {
   },
   tests: {
     run: (cfg) => {
-      // Validate every field before sending to main
       assertEnv(cfg.env);
       assertInt(cfg.workers, 1, 16);
       assertInt(cfg.retries, 0, 5);
       if (!Array.isArray(cfg.specPaths) || cfg.specPaths.length === 0) throw new Error('No spec paths');
       cfg.specPaths.forEach(p => assertPath(p));
+      const reporter = VALID_REPORTERS.includes(cfg.reporter) ? cfg.reporter : 'default';
       return ipcRenderer.invoke('tests:run', {
         specPaths: cfg.specPaths,
         env:       cfg.env,
         headed:    !!cfg.headed,
         debug:     !!cfg.debug,
         workers:   assertInt(cfg.workers, 1, 16),
-        retries:   assertInt(cfg.retries, 0, 5)
+        retries:   assertInt(cfg.retries, 0, 5),
+        reporter
       });
     },
     stop:      ()   => ipcRenderer.invoke('tests:stop'),

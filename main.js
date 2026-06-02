@@ -77,7 +77,7 @@ function resolveEnv() {
 }
 
 function findBin(name) {
-  for (const dir of ['/usr/local/bin', '/opt/homebrew/bin', `${os.homedir()}/.nvm/current/bin`]) {
+  for (const dir of ['/usr/bin', '/bin', '/usr/local/bin', '/opt/homebrew/bin', `${os.homedir()}/.nvm/current/bin`]) {
     const full = path.join(dir, name);
     if (fs.existsSync(full)) return full;
   }
@@ -208,18 +208,23 @@ ipcMain.handle('specs:folders', () => {
   return [...folders].sort();
 });
 
+const VALID_REPORTERS = ['default', 'line', 'dot', 'list'];
+
 // ── IPC — Tests ───────────────────────────────────────────────
 let runningProc = null;
-ipcMain.handle('tests:run', (_, { specPaths, env, headed, debug, workers, retries }) => {
-  // FIX 3: Validate each spec path is inside repo
+ipcMain.handle('tests:run', (_, { specPaths, env, headed, debug, workers, retries, reporter }) => {
+  // Validate each spec path is inside repo
   const safeSpecs = specPaths.map(p => {
     try { return path.relative(REPO_DIR, safeRepoPath(path.join(REPO_DIR, p))); }
     catch { return null; }
   }).filter(Boolean);
 
-  const args = ['playwright', 'test', ...safeSpecs];
-  if (headed || debug) args.push('--headed');
-  if (debug) args.push('--debug');
+  const safeReporter = VALID_REPORTERS.includes(reporter) ? reporter : 'default';
+
+  const npxArgs = ['playwright', 'test', ...safeSpecs];
+  if (headed || debug) npxArgs.push('--headed');
+  if (debug) npxArgs.push('--debug');
+  if (safeReporter !== 'default') npxArgs.push(`--reporter=${safeReporter}`);
 
   const envVars = {
     ...resolveEnv(),
@@ -229,8 +234,16 @@ ipcMain.handle('tests:run', (_, { specPaths, env, headed, debug, workers, retrie
     WORKERS: String(parseInt(workers) || 2),
     RETRIES: String(parseInt(retries) || 0)
   };
+
   const npx = findBin('npx');
-  runningProc = spawn(npx, args, { cwd: REPO_DIR, env: envVars });
+  const caffeinate = findBin('caffeinate');
+
+  // Wrap with caffeinate -i to prevent Mac sleep during long runs
+  const [cmd, args] = caffeinate !== 'caffeinate'
+    ? [caffeinate, ['-i', npx, ...npxArgs]]
+    : [npx, npxArgs];
+
+  runningProc = spawn(cmd, args, { cwd: REPO_DIR, env: envVars });
   runningProc.stdout.on('data', d => mainWindow?.webContents.send('tests:output', d.toString()));
   runningProc.stderr.on('data', d => mainWindow?.webContents.send('tests:output', d.toString()));
   runningProc.on('close', code => { runningProc = null; mainWindow?.webContents.send('tests:done', { exitCode: code }); });

@@ -75,11 +75,11 @@ function getSelected(groupId) {
   return document.getElementById(groupId)?.querySelector('.option-btn.active')?.dataset.value ?? null;
 }
 
-bindOptionGroup('env-options',     () => showStep(2));
-bindOptionGroup('browser-options', () => showStep(6));
-bindOptionGroup('worker-options',  () => document.getElementById('run-btn').click());
-bindOptionGroup('retry-options',   () => document.getElementById('run-btn').click());
-bindOptionGroup('branch-options',  () => document.getElementById('branch-next').click());
+bindOptionGroup('env-options',      () => showStep(2));
+bindOptionGroup('browser-options',  () => showStep(6));
+bindOptionGroup('worker-options',   () => document.getElementById('run-btn').click());
+bindOptionGroup('retry-options',    () => document.getElementById('run-btn').click());
+bindOptionGroup('branch-options',   () => document.getElementById('branch-next').click());
 
 // ── Wizard state ──────────────────────────────────────────
 let skipSpecStep   = false;
@@ -379,6 +379,24 @@ document.getElementById('run-btn').addEventListener('click', async () => {
   output.innerHTML = '';
   window.api.tests.offOutput();
   window.api.tests.offDone();
+
+  // Show the exact command being run
+  const headed = browser !== 'headless';
+  const debug  = browser === 'debug';
+  const envLine = `PLAYWRIGHT_ENV=${env} EXECUTION_SETTINGS=1 HEADLESS=${headed ? 'false' : 'true'} WORKERS=${workers} RETRIES=${retries}`;
+  const cmdParts = ['caffeinate -i npx playwright test', ...specPaths];
+  if (headed || debug) cmdParts.push('--headed');
+  if (debug) cmdParts.push('--debug');
+  const cmdLine = cmdParts.join(' ');
+
+  const cmdBlock = document.createElement('div');
+  cmdBlock.className = 'cmd-preview';
+  cmdBlock.innerHTML = `
+    <div class="cmd-preview-label">▶ Command</div>
+    <div class="cmd-preview-env">${escapeHtml(envLine)} \\</div>
+    <div class="cmd-preview-cmd">${escapeHtml(cmdLine)}</div>
+  `;
+  output.appendChild(cmdBlock);
 
   let fullLog = '';
 
