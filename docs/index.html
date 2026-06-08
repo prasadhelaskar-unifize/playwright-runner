@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Unifize Test Runner — Run Playwright tests, no terminal required</title>
+<meta name="description" content="A native macOS desktop app for running Playwright tests on the Unifize platform. Download the latest build, install in seconds, no terminal knowledge required." />
+<link rel="icon" href="icon.png" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117; --surface: #181c27; --surface2: #1e2333;
+    --border: #2a2f42; --text: #e2e8f0; --muted: #64748b;
+    --accent: #6366f1; --accent-h: #818cf8;
+    --green: #22c55e; --blue: #3b82f6; --purple: #a855f7; --yellow: #f59e0b;
+    --radius: 12px;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --mono: 'SF Mono', ui-monospace, 'Cascadia Code', Menlo, monospace;
+  }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent-h); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+  code { font-family: var(--mono); font-size: 0.86em; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; color: #c7d2fe; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; overflow-x: auto; margin: 14px 0; }
+  pre code { background: none; border: none; padding: 0; color: var(--text); }
+
+  /* Header */
+  header { position: sticky; top: 0; z-index: 50; background: rgba(15,17,23,0.85); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+  .nav { display: flex; align-items: center; gap: 10px; height: 60px; }
+  .nav img { width: 28px; height: 28px; border-radius: 7px; }
+  .nav .name { font-weight: 700; font-size: 15px; }
+  .nav .links { margin-left: auto; display: flex; gap: 22px; }
+  .nav .links a { color: var(--muted); font-size: 14px; font-weight: 500; }
+  .nav .links a:hover { color: var(--text); text-decoration: none; }
+  @media (max-width: 640px) { .nav .links { display: none; } }
+
+  /* Hero */
+  .hero { text-align: center; padding: 80px 0 64px; }
+  .hero .logo { width: 96px; height: 96px; border-radius: 22px; box-shadow: 0 12px 40px rgba(99,102,241,0.35); margin-bottom: 28px; }
+  .hero h1 { font-size: 44px; line-height: 1.1; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 18px; }
+  .hero h1 .grad { background: linear-gradient(135deg, var(--accent-h), var(--purple)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero p.lead { font-size: 19px; color: var(--muted); max-width: 620px; margin: 0 auto 36px; }
+  .badges { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 40px; }
+  .badge { font-size: 12px; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 5px 14px; }
+
+  /* Download buttons */
+  .downloads { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .dl { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 230px; padding: 16px 24px; border-radius: 14px; font-weight: 600; transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s; }
+  .dl:hover { text-decoration: none; transform: translateY(-2px); }
+  .dl .big { font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .dl .small { font-size: 12px; font-weight: 500; opacity: 0.8; }
+  .dl.primary { background: var(--accent); color: #fff; box-shadow: 0 8px 24px rgba(99,102,241,0.4); }
+  .dl.primary:hover { background: var(--accent-h); }
+  .dl.secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+  .dl.secondary:hover { border-color: var(--accent); }
+  .dl-note { margin-top: 18px; font-size: 13px; color: var(--muted); }
+
+  /* Sections */
+  section { padding: 56px 0; border-top: 1px solid var(--border); }
+  section h2 { font-size: 28px; font-weight: 800; letter-spacing: -0.01em; margin-bottom: 8px; }
+  section .sub { color: var(--muted); margin-bottom: 32px; }
+
+  /* Feature grid */
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 720px) { .features { grid-template-columns: 1fr; } }
+  .feature { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; transition: border-color 0.15s, transform 0.1s; }
+  .feature:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .feature .ico { font-size: 22px; margin-bottom: 12px; }
+  .feature h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  .feature p { font-size: 13px; color: var(--muted); }
+
+  /* Steps */
+  .steps { counter-reset: step; display: flex; flex-direction: column; gap: 18px; }
+  .stepline { display: flex; gap: 16px; align-items: flex-start; }
+  .stepline .num { counter-increment: step; flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+  .stepline .num::before { content: counter(step); }
+  .stepline .body h3 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .stepline .body p { font-size: 14px; color: var(--muted); }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td:first-child { font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  .tbl-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--yellow); border-radius: 8px; padding: 14px 18px; margin: 18px 0; font-size: 14px; }
+  .callout strong { color: var(--yellow); }
+
+  footer { border-top: 1px solid var(--border); padding: 40px 0; text-align: center; color: var(--muted); font-size: 13px; }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <img src="icon.png" alt="Unifize Test Runner icon" />
+    <span class="name">Unifize Test Runner</span>
+    <nav class="links">
+      <a href="#download">Download</a>
+      <a href="#install">Install</a>
+      <a href="#usage">Usage</a>
+      <a href="#features">Features</a>
+      <a href="https://github.com/prasadhelaskar-unifize/playwright-runner">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<!-- Hero -->
+<div class="wrap hero" id="download">
+  <img class="logo" src="icon.png" alt="Unifize Test Runner" />
+  <h1>Run Playwright tests.<br><span class="grad">No terminal required.</span></h1>
+  <p class="lead">A native macOS desktop app for running Playwright tests on the Unifize platform — a guided wizard, live output, and one-click HTML reports.</p>
+  <div class="badges">
+    <span class="badge">🖥 macOS 11+</span>
+    <span class="badge">⚡ Apple Silicon &amp; Intel</span>
+    <span class="badge">v1.0.0</span>
+  </div>
+
+  <div class="downloads">
+    <a class="dl primary" href="https://github.com/prasadhelaskar-unifize/playwright-runner/releases/latest/download/Unifize.Test.Runner-1.0.0-arm64.dmg">
+      <span class="big">↓ Download for Mac</span>
+      <span class="small">Apple Silicon · M1 / M2 / M3</span>
+    </a>
+    <a class="dl secondary" href="https://github.com/prasadhelaskar-unifize/playwright-runner/releases/latest/download/Unifize.Test.Runner-1.0.0.dmg">
+      <span class="big">↓ Download for Mac</span>
+      <span class="small">Intel · x64</span>
+    </a>
+  </div>
+  <p class="dl-note">Not sure which Mac you have? Click  → <strong>About This Mac</strong>. "Apple M1/M2/M3" = Apple Silicon. · <a href="https://github.com/prasadhelaskar-unifize/playwright-runner/releases">All releases</a></p>
+</div>
+
+<!-- Requirements -->
+<section id="requirements">
+  <div class="wrap">
+    <h2>Before you start</h2>
+    <p class="sub">These must already be installed on your Mac before running the app.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Dependency</th><th>How to get it</th></tr></thead>
+        <tbody>
+          <tr><td>Node.js + npm</td><td><a href="https://nodejs.org">nodejs.org</a></td></tr>
+          <tr><td>Playwright</td><td>Run <code>npm install</code> inside the repo</td></tr>
+          <tr><td>Git</td><td>Pre-installed on macOS</td></tr>
+          <tr><td>playwright-tests repo</td><td>Cloned anywhere on your Mac</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- Install -->
+<section id="install">
+  <div class="wrap">
+    <h2>Installation</h2>
+    <p class="sub">From download to first run in under a minute.</p>
+    <div class="steps">
+      <div class="stepline"><div class="num"></div><div class="body">
+        <h3>Download the DMG</h3>
+        <p>Pick the build for your Mac from the buttons above — Apple Silicon or Intel.</p>
+      </div></div>
+      <div class="stepline"><div class="num"></div><div class="body">
+        <h3>Drag to Applications</h3>
+        <p>Open the DMG and drag <strong>Unifize Test Runner</strong> into your <strong>Applications</strong> folder.</p>
+      </div></div>
+      <div class="stepline"><div class="num"></div><div class="body">
+        <h3>Bypass Gatekeeper (first launch only)</h3>
+        <p>The app is unsigned, so macOS may block it. Either right-click the app → <strong>Open</strong> → <strong>Open</strong>, or run this once in Terminal:</p>
+        <pre><code>xattr -dr com.apple.quarantine "/Applications/Unifize Test Runner.app"</code></pre>
+      </div></div>
+      <div class="stepline"><div class="num"></div><div class="body">
+        <h3>Pick your repo</h3>
+        <p>On first launch a folder picker appears — select your <code>playwright-tests</code> repo. The path is saved to <code>~/.unifize-test-runner.conf</code> and reused on every future launch.</p>
+      </div></div>
+    </div>
+    <div class="callout"><strong>Keychain prompt:</strong> On first run macOS may ask for keychain access for git credentials — click <strong>Always Allow</strong> so it won't prompt again.</div>
+  </div>
+</section>
+
+<!-- Usage -->
+<section id="usage">
+  <div class="wrap">
+    <h2>How to use it</h2>
+    <p class="sub">Click <strong>Run Tests</strong> and step through the 6-step wizard.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Step</th><th>What you choose</th></tr></thead>
+        <tbody>
+          <tr><td>1 — Environment</td><td>Production (app.unifize.com) or Staging</td></tr>
+          <tr><td>2 — Branch</td><td>Switch branch + auto-sync from upstream</td></tr>
+          <tr><td>3 — Module / Folder</td><td>Universal search — finds folders <em>and</em> spec files</td></tr>
+          <tr><td>4 — Spec Files</td><td>Multi-select specs (Cmd+click), or double-click to select &amp; continue</td></tr>
+          <tr><td>5 — Browser Mode</td><td>Headless / Headed / Debug (Playwright inspector)</td></tr>
+          <tr><td>6 — Workers &amp; Retries</td><td>Parallel workers (1 / 2 / 4) and retry count (0 / 1 / 2)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout" style="border-left-color: var(--accent);"><strong style="color: var(--accent-h);">Tip:</strong> Double-click any option at any step to select it and jump to the next step automatically. Hit <strong>▶ Run Tests</strong> to stream live output, then <strong>Open Report →</strong> for the full HTML report.</div>
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features">
+  <div class="wrap">
+    <h2>What's inside</h2>
+    <p class="sub">Everything the QA team needs, in one window.</p>
+    <div class="features">
+      <div class="feature"><div class="ico">🖥</div><h3>Native macOS app</h3><p>Installs like any .app and lives in your Applications folder.</p></div>
+      <div class="feature"><div class="ico">🔀</div><h3>Branch switcher</h3><p>Fetch &amp; hard-reset to upstream in one click — no merge conflicts.</p></div>
+      <div class="feature"><div class="ico">🔍</div><h3>Universal search</h3><p>Search folders and spec files by name in the same box.</p></div>
+      <div class="feature"><div class="ico">📺</div><h3>Live terminal</h3><p>Streams Playwright output in real time with full ANSI colour.</p></div>
+      <div class="feature"><div class="ico">📋</div><h3>Report viewer</h3><p>Auto-finds and opens the latest Playwright HTML report in your browser.</p></div>
+      <div class="feature"><div class="ico">🔁</div><h3>Change repo anytime</h3><p>Re-pick the playwright-tests folder from the sidebar whenever you need.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- Build from source -->
+<section id="build">
+  <div class="wrap">
+    <h2>Building from source</h2>
+    <p class="sub">Prefer to build it yourself? Clone the repo and run:</p>
+<pre><code>git clone https://github.com/prasadhelaskar-unifize/playwright-runner.git
+cd playwright-runner
+npm install        # install dependencies
+npm start          # run in development mode
+npm run build      # build standalone macOS DMG → dist/</code></pre>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>Unifize Test Runner · built by Unifize QA · <a href="https://github.com/prasadhelaskar-unifize/playwright-runner">View on GitHub</a></p>
+  </div>
+</footer>
+
+</body>
+</html>
