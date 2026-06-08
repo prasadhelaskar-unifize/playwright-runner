@@ -3,7 +3,14 @@
    ════════════════════════════════════════════════════════ */
 
 // ── Execution state ───────────────────────────────────────
-let isRunning = false;
+let isRunning      = false;
+
+// ── Progress tracking state ───────────────────────────────
+let progressTotal  = 0;   // total tests expected (from scan or Playwright announce)
+let progressDone   = 0;   // tests completed (pass + fail + skip)
+let progressFailed = 0;   // tests that failed
+let specTrackerMap = {};  // relPath → 'pending'|'running'|'passed'|'failed'
+let outputLineBuf  = '';  // buffer for incomplete output lines
 
 function setRunning(val) {
   isRunning = val;
@@ -135,6 +142,8 @@ function showStep(n) {
 function showWizard() {
   document.getElementById('wizard').style.display = 'block';
   document.getElementById('terminal-panel').style.display = 'none';
+  document.getElementById('progress-strip').style.display = 'none';
+  document.getElementById('spec-tracker').style.display   = 'none';
   selectedFolders.clear();
   updateFolderSelectionBadge();
   showStep(1);
@@ -466,6 +475,148 @@ document.getElementById('browser-back').addEventListener('click', () =>
 // ── Step 6 ────────────────────────────────────────────────
 document.getElementById('workers-back').addEventListener('click', () => showStep(5));
 
+// ── Progress helpers ──────────────────────────────────────
+
+/** Return all allSpecs entries that match a path (file or folder). */
+function specsMatchingPath(pathVal) {
+  if (pathVal.endsWith('.spec.js')) return allSpecs.filter(s => s.path === pathVal);
+  const norm = pathVal.replace(/\/$/, '');   // remove trailing slash
+  return allSpecs.filter(s =>
+    s.folder === norm ||
+    s.folder.startsWith(norm + '/') ||
+    s.path.startsWith(norm + '/')
+  );
+}
+
+/** Set up progress state for the run about to start. */
+function initProgress(specPaths) {
+  progressTotal  = 0;
+  progressDone   = 0;
+  progressFailed = 0;
+  specTrackerMap = {};
+  outputLineBuf  = '';
+
+  for (const sp of specPaths) {
+    for (const s of specsMatchingPath(sp)) {
+      progressTotal += (s.count || 0);
+      if (!(s.path in specTrackerMap)) specTrackerMap[s.path] = 'pending';
+    }
+  }
+
+  // Show spec chips only when ≤ 20 individual files are tracked
+  const trackerEl = document.getElementById('spec-tracker');
+  const count = Object.keys(specTrackerMap).length;
+  if (count > 0 && count <= 20) {
+    renderSpecTracker();
+    trackerEl.style.display = 'flex';
+  } else {
+    trackerEl.style.display = 'none';
+  }
+
+  document.getElementById('progress-strip').style.display = 'flex';
+  updateProgressUI();
+}
+
+/** Render spec chips from specTrackerMap. */
+function renderSpecTracker() {
+  const el = document.getElementById('spec-tracker');
+  el.innerHTML = '';
+  for (const [filePath, status] of Object.entries(specTrackerMap)) {
+    const name = filePath.split('/').pop().replace('.spec.js', '');
+    const chip = document.createElement('div');
+    chip.className = `spec-chip ${status}`;
+    chip.dataset.specPath = filePath;
+    chip.title = filePath;
+    chip.innerHTML = `<span class="spec-chip-dot"></span>${escapeHtml(name)}`;
+    el.appendChild(chip);
+  }
+}
+
+/** Update a single spec chip's visual state. */
+function updateSpecChip(specPath) {
+  const chip = document.querySelector(`.spec-chip[data-spec-path="${CSS.escape(specPath)}"]`);
+  if (chip) chip.className = `spec-chip ${specTrackerMap[specPath] || 'pending'}`;
+}
+
+/** Re-paint the progress bar and label. */
+function updateProgressUI() {
+  const fill  = document.getElementById('progress-bar-fill');
+  const label = document.getElementById('progress-label');
+  if (!fill || !label) return;
+
+  const pct = progressTotal > 0 ? Math.round((progressDone / progressTotal) * 100) : 0;
+  fill.style.width = `${Math.min(pct, 100)}%`;
+  fill.classList.toggle('failing', progressFailed > 0);
+
+  const parts = [`${progressDone} / ${progressTotal} tests`];
+  if (progressFailed > 0) parts.push(`${progressFailed} ✗`);
+  parts.push(`${pct}%`);
+  label.textContent = parts.join(' · ');
+}
+
+/** Parse one line of Playwright output for progress events. */
+function parseProgressLine(line) {
+  const clean = line.replace(/\x1b\[[^m]*m/g, '');  // strip ANSI
+
+  // "Running 24 tests using 2 workers" — use Playwright's own total
+  const totM = clean.match(/Running (\d+) tests? using/);
+  if (totM) { progressTotal = parseInt(totM[1]); updateProgressUI(); return; }
+
+  // Result lines contain a spec file path
+  const specM = clean.match(/(tests\/[^\s:›·(]+\.spec\.js)/);
+  if (!specM) return;
+  const specPath = specM[1].trim();
+
+  const isPassed  = clean.includes('✓');
+  const isFailed  = clean.includes('✗') || clean.includes('×') || clean.includes('✘');
+  const isSkipped = !isPassed && !isFailed && /^\s*-\s+\d+/.test(clean);
+
+  if (!isPassed && !isFailed && !isSkipped) return;
+
+  progressDone++;
+
+  if (isFailed) {
+    progressFailed++;
+    specTrackerMap[specPath] = 'failed';          // red — stays red
+  } else {
+    // pass or skip — mark as running (yellow pulse) unless already failed
+    if (specTrackerMap[specPath] !== 'failed') {
+      specTrackerMap[specPath] = 'running';
+    }
+  }
+
+  updateProgressUI();
+  updateSpecChip(specPath);
+}
+
+/** Feed a raw output chunk through the line-by-line parser. */
+function processOutputChunk(chunk) {
+  outputLineBuf += chunk;
+  const lines = outputLineBuf.split('\n');
+  outputLineBuf = lines.pop();           // keep incomplete trailing line
+  for (const line of lines) parseProgressLine(line);
+}
+
+/** Finalise spec tracker after run ends: running → passed, hide bar on stop. */
+function finaliseProgress(stopped = false) {
+  if (stopped) {
+    document.getElementById('progress-strip').style.display = 'none';
+    document.getElementById('spec-tracker').style.display  = 'none';
+    return;
+  }
+  // Flip all still-running chips to passed
+  for (const path of Object.keys(specTrackerMap)) {
+    if (specTrackerMap[path] === 'running') specTrackerMap[path] = 'passed';
+  }
+  renderSpecTracker();
+  // Ensure bar reaches 100% if we got all tests
+  if (progressDone >= progressTotal && progressTotal > 0) {
+    const fill = document.getElementById('progress-bar-fill');
+    if (fill) fill.style.width = '100%';
+  }
+  updateProgressUI();
+}
+
 // ── Run Tests ─────────────────────────────────────────────
 document.getElementById('run-btn').addEventListener('click', async () => {
   const env     = getSelected('env-options')     || 'prod';
@@ -488,6 +639,9 @@ document.getElementById('run-btn').addEventListener('click', async () => {
   output.innerHTML = '';
   window.api.tests.offOutput();
   window.api.tests.offDone();
+
+  // Initialise progress tracking for this run
+  initProgress(specPaths);
 
   // Show the exact command being run
   const headed = browser !== 'headless';
@@ -513,6 +667,7 @@ document.getElementById('run-btn').addEventListener('click', async () => {
 
   window.api.tests.onOutput(async data => {
     fullLog += data;
+    processOutputChunk(data);   // update progress bar + spec chips in real time
     const span = document.createElement('span');
     // FIX 2: Use safe ansi-to-html via main process (escapeXML: true)
     span.innerHTML = await window.api.ansi.convert(data);
@@ -522,6 +677,7 @@ document.getElementById('run-btn').addEventListener('click', async () => {
 
   window.api.tests.onDone(async ({ exitCode }) => {
     setRunning(false);
+    finaliseProgress(false);   // flip running chips → passed, lock bar at 100%
     document.getElementById('terminal-footer').style.display = 'flex';
     document.getElementById('stop-btn').style.display = 'none';
 
@@ -554,6 +710,7 @@ document.getElementById('run-btn').addEventListener('click', async () => {
 document.getElementById('stop-btn').addEventListener('click', async () => {
   await window.api.tests.stop();
   setRunning(false);
+  finaliseProgress(true);   // hide bar + chips on manual stop
   document.getElementById('stop-btn').style.display = 'none';
   document.getElementById('terminal-footer').style.display = 'flex';
   document.getElementById('run-summary').innerHTML = '<span class="summary-fail">■ Stopped by user</span>';
