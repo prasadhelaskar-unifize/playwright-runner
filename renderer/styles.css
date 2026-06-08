@@ -125,6 +125,8 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 
 .reporter-group { grid-template-columns: repeat(4, 1fr); margin-top: 4px; }
 
+.folder-selection-badge { display: inline-flex; align-items: center; margin-left: auto; font-size: 11px; font-weight: 600; color: var(--accent-h); background: rgba(99,102,241,0.15); border: 1px solid var(--accent); border-radius: 20px; padding: 3px 10px; }
+
 .caffeinate-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin: 16px 0 8px; }
 .caffeinate-label { font-size: 13px; color: var(--text); }
 .caffeinate-badge { font-size: 11px; font-weight: 600; color: var(--green); background: rgba(34,197,94,0.1); border: 1px solid var(--green); border-radius: 20px; padding: 3px 10px; }
@@ -187,3 +189,29 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* ── Running nav indicator ── */
+.nav-item.running { position: relative; color: var(--green) !important; background: rgba(34,197,94,0.1) !important; }
+.nav-item.running::after { content: ''; position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse-dot 1.2s ease-in-out infinite; }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.7); } }
+
+/* ── Running warning banner ── */
+.running-warning {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px;
+  background: #1a1a2e; border: 1.5px solid var(--yellow);
+  border-radius: 12px; padding: 12px 18px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  z-index: 999; max-width: 600px; width: calc(100% - 48px);
+  animation: slide-up 0.2s ease-out;
+}
+@keyframes slide-up { from { opacity: 0; transform: translateX(-50%) translateY(12px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+.running-warning-icon { font-size: 18px; flex-shrink: 0; }
+.running-warning-text { font-size: 13px; color: var(--yellow); flex: 1; font-weight: 500; }
+.running-warning-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+.warn-btn { padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1.5px solid; transition: opacity 0.15s; }
+.warn-stay  { background: var(--green);  color: #fff; border-color: var(--green); }
+.warn-leave { background: transparent;   color: var(--muted); border-color: var(--border); }
+.warn-btn:hover { opacity: 0.85; }

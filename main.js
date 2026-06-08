@@ -224,7 +224,8 @@ ipcMain.handle('tests:run', (_, { specPaths, env, headed, debug, workers, retrie
   const npxArgs = ['playwright', 'test', ...safeSpecs];
   if (headed || debug) npxArgs.push('--headed');
   if (debug) npxArgs.push('--debug');
-  if (safeReporter !== 'default') npxArgs.push(`--reporter=${safeReporter}`);
+  npxArgs.push(`--workers=${parseInt(workers) || 2}`);
+  npxArgs.push(`--retries=${parseInt(retries) || 0}`);
 
   const envVars = {
     ...resolveEnv(),
@@ -243,13 +244,51 @@ ipcMain.handle('tests:run', (_, { specPaths, env, headed, debug, workers, retrie
     ? [caffeinate, ['-i', npx, ...npxArgs]]
     : [npx, npxArgs];
 
-  runningProc = spawn(cmd, args, { cwd: REPO_DIR, env: envVars });
+  // detached: true creates a new process group so we can kill the whole tree
+  runningProc = spawn(cmd, args, { cwd: REPO_DIR, env: envVars, detached: true });
   runningProc.stdout.on('data', d => mainWindow?.webContents.send('tests:output', d.toString()));
   runningProc.stderr.on('data', d => mainWindow?.webContents.send('tests:output', d.toString()));
   runningProc.on('close', code => { runningProc = null; mainWindow?.webContents.send('tests:done', { exitCode: code }); });
+  runningProc.unref(); // don't block the app from quitting
   return { started: true };
 });
-ipcMain.handle('tests:stop', () => { if (runningProc) { runningProc.kill('SIGTERM'); runningProc = null; } });
+
+ipcMain.handle('tests:stop', () => {
+  if (!runningProc) return;
+
+  const rootPid = runningProc.pid;
+  runningProc = null;
+
+  // Find all descendant PIDs of our root process, then SIGKILL them all.
+  // This only kills children of OUR process — never touches Chrome, other Node, etc.
+  try {
+    // pgrep -P <pid> returns direct children; we walk the tree recursively
+    const getAllDescendants = (pid) => {
+      try {
+        const { spawnSync } = require('child_process');
+        const result = spawnSync('pgrep', ['-P', String(pid)], { encoding: 'utf8' });
+        const children = (result.stdout || '').trim().split('\n').filter(Boolean).map(Number);
+        let all = [...children];
+        for (const child of children) {
+          all = all.concat(getAllDescendants(child));
+        }
+        return all;
+      } catch { return []; }
+    };
+
+    const descendants = getAllDescendants(rootPid);
+    const allPids = [rootPid, ...descendants];
+
+    // Kill all with SIGKILL — our process tree only
+    for (const pid of allPids) {
+      try { process.kill(pid, 'SIGKILL'); } catch {}
+    }
+
+    // Also kill the process group as a safety net
+    try { process.kill(-rootPid, 'SIGKILL'); } catch {}
+
+  } catch {}
+});
 
 // ── IPC — Reports ─────────────────────────────────────────────
 ipcMain.handle('report:find', () => {

@@ -62,7 +62,12 @@
           </div>
           <!-- Step 3 -->
           <div class="step" id="step-3">
-            <div class="step-header"><span class="step-badge">3 / 6</span><h2>Module / Folder</h2></div>
+            <div class="step-header">
+              <span class="step-badge">3 / 6</span>
+              <h2>Module / Folder</h2>
+              <span class="hint">Cmd+click to select multiple folders</span>
+              <span class="folder-selection-badge" id="folder-selection-badge" style="display:none"></span>
+            </div>
             <div class="search-wrap">
               <span class="search-icon">🔍</span>
               <input class="search-input" id="folder-search" type="text" placeholder="Search folders or spec files…" autocomplete="off"/>
@@ -164,6 +169,16 @@
       </section>
     </main>
   </div>
+  <!-- Running warning banner -->
+  <div class="running-warning" id="running-warning" style="display:none">
+    <span class="running-warning-icon">⚠️</span>
+    <span class="running-warning-text">Tests are still running — leaving will not stop them</span>
+    <div class="running-warning-actions">
+      <button class="warn-btn warn-stay" id="warn-stay">↩ Stay on run screen</button>
+      <button class="warn-btn warn-leave" id="warn-leave">Leave anyway →</button>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>

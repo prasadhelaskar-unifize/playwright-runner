@@ -2,19 +2,55 @@
    Unifize Test Runner — Renderer
    ════════════════════════════════════════════════════════ */
 
+// ── Execution state ───────────────────────────────────────
+let isRunning = false;
+
+function setRunning(val) {
+  isRunning = val;
+  const runNav = document.querySelector('.nav-item[data-view="run"]');
+  runNav.classList.toggle('running', val);
+}
+
 // ── Navigation ────────────────────────────────────────────
 document.querySelectorAll('.nav-item').forEach(btn =>
-  btn.addEventListener('click', () => showView(btn.dataset.view))
+  btn.addEventListener('click', () => handleNavClick(btn.dataset.view))
 );
 document.querySelectorAll('[data-goto]').forEach(el =>
   el.addEventListener('click', () => showView(el.dataset.goto))
 );
 
+function handleNavClick(viewId) {
+  if (isRunning && viewId !== 'run') {
+    showRunningWarning(viewId);
+    return;
+  }
+  showView(viewId);
+}
+
+function showRunningWarning(targetView) {
+  const banner = document.getElementById('running-warning');
+  banner.style.display = 'flex';
+  banner.dataset.target = targetView;
+  clearTimeout(banner._timer);
+  banner._timer = setTimeout(() => { banner.style.display = 'none'; }, 6000);
+}
+
+// Warning banner buttons
+document.getElementById('warn-leave').addEventListener('click', () => {
+  const banner = document.getElementById('running-warning');
+  const target = banner.dataset.target;
+  banner.style.display = 'none';
+  showView(target);
+});
+document.getElementById('warn-stay').addEventListener('click', () => {
+  document.getElementById('running-warning').style.display = 'none';
+  showView('run');
+});
+
 function showView(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === `view-${id}`));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === id));
   if (id === 'report') loadReport();
-  if (id === 'run') showWizard();
 }
 
 // ── Repo path display ─────────────────────────────────────
@@ -82,11 +118,12 @@ bindOptionGroup('retry-options',    () => document.getElementById('run-btn').cli
 bindOptionGroup('branch-options',   () => document.getElementById('branch-next').click());
 
 // ── Wizard state ──────────────────────────────────────────
-let skipSpecStep   = false;
-let allSpecs       = [];
-let allFolders     = [];
-let selectedFolder = '';
-let directSpecPath = null;
+let skipSpecStep    = false;
+let allSpecs        = [];
+let allFolders      = [];
+let selectedFolder  = '';
+let selectedFolders = new Set(); // multi-folder selection
+let directSpecPath  = null;
 
 function showStep(n) {
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
@@ -98,6 +135,8 @@ function showStep(n) {
 function showWizard() {
   document.getElementById('wizard').style.display = 'block';
   document.getElementById('terminal-panel').style.display = 'none';
+  selectedFolders.clear();
+  updateFolderSelectionBadge();
   showStep(1);
 }
 showWizard();
@@ -147,6 +186,8 @@ function resetFolderSearch() {
   const si = document.getElementById('folder-search');
   if (si) si.value = '';
   document.getElementById('folder-search-clear').style.display = 'none';
+  selectedFolders.clear();
+  updateFolderSelectionBadge();
   renderUniversalSearch('');
 }
 
@@ -199,12 +240,24 @@ function renderSectionLabel(list, text) {
   list.appendChild(label);
 }
 
+function updateFolderSelectionBadge() {
+  const badge = document.getElementById('folder-selection-badge');
+  if (!badge) return;
+  const count = selectedFolders.size;
+  if (count === 0) {
+    badge.style.display = 'none';
+  } else {
+    badge.style.display = 'inline-flex';
+    badge.textContent = `${count} folder${count > 1 ? 's' : ''} selected`;
+  }
+}
+
 function addFolderRow(list, name, path, subtitle, isPinned, isSpec, query, count = null) {
   const row = document.createElement('div');
-  const isSelected = !isSpec && path === selectedFolder;
+  const isSelected = !isSpec && selectedFolders.has(path);
   row.className = ['folder-item', isSelected ? 'selected' : '', isPinned ? 'pinned' : '', isSpec ? 'spec-result' : ''].filter(Boolean).join(' ');
   row.dataset.path   = path;
-  row.dataset.isSpec = isSpec  ? 'true' : 'false';
+  row.dataset.isSpec = isSpec   ? 'true' : 'false';
   row.dataset.isAll  = isPinned ? 'true' : 'false';
 
   const icon = isSpec ? '📄' : isPinned ? '📁' : '🗂';
@@ -216,17 +269,53 @@ function addFolderRow(list, name, path, subtitle, isPinned, isSpec, query, count
     <span class="folder-item-tag">${isSpec ? 'spec' : isPinned ? 'all' : 'folder'}</span>
   `;
 
-  row.addEventListener('click', () => {
-    list.querySelectorAll('.folder-item').forEach(r => r.classList.remove('selected'));
-    row.classList.add('selected');
-    if (!isSpec) selectedFolder = path;
+  row.addEventListener('click', (e) => {
+    if (isSpec) {
+      // specs: single select only
+      list.querySelectorAll('.folder-item').forEach(r => r.classList.remove('selected'));
+      row.classList.add('selected');
+      selectedFolders.clear();
+      return;
+    }
+
+    if (e.metaKey || e.ctrlKey) {
+      // Cmd+click: toggle this folder in multi-select
+      // Pinned "ALL" items clear multi-select and act as single select
+      if (isPinned) {
+        selectedFolders.clear();
+        list.querySelectorAll('.folder-item').forEach(r => r.classList.remove('selected'));
+        row.classList.add('selected');
+        selectedFolder = path;
+      } else {
+        if (selectedFolders.has(path)) {
+          selectedFolders.delete(path);
+          row.classList.remove('selected');
+        } else {
+          selectedFolders.add(path);
+          row.classList.add('selected');
+        }
+      }
+    } else {
+      // Normal click: single select, clear others
+      list.querySelectorAll('.folder-item').forEach(r => r.classList.remove('selected'));
+      row.classList.add('selected');
+      selectedFolders.clear();
+      if (!isPinned) selectedFolders.add(path);
+      selectedFolder = path;
+    }
+    updateFolderSelectionBadge();
   });
 
   row.addEventListener('dblclick', () => {
     list.querySelectorAll('.folder-item').forEach(r => r.classList.remove('selected'));
     row.classList.add('selected');
     row.classList.add('dblclick-flash');
+    if (!isSpec && !isPinned) {
+      selectedFolders.clear();
+      selectedFolders.add(path);
+    }
     if (!isSpec) selectedFolder = path;
+    updateFolderSelectionBadge();
     setTimeout(() => handleFolderNext(path, isSpec, isPinned), 180);
   });
 
@@ -250,6 +339,8 @@ folderClear.addEventListener('click', () => {
 
 function handleFolderNext(path, isSpec, isAll) {
   directSpecPath = null;
+
+  // Direct spec pick from search
   if (isSpec) {
     directSpecPath = path;
     skipSpecStep = true;
@@ -257,15 +348,20 @@ function handleFolderNext(path, isSpec, isAll) {
     showStep(5);
     return;
   }
+
+  // Pinned ALL shortcuts → skip spec step
   if (isAll) {
     skipSpecStep = true;
     selectedFolder = path;
+    selectedFolders.clear();
     showStep(5);
     return;
   }
+
+  // Multi-folder or single folder → show spec list
   skipSpecStep = false;
-  selectedFolder = path;
-  renderSpecList('', path);
+  const foldersToLoad = selectedFolders.size > 0 ? [...selectedFolders] : [path];
+  renderSpecList('', foldersToLoad);
   document.getElementById('spec-search').value = '';
   document.getElementById('spec-search-clear').style.display = 'none';
   showStep(4);
@@ -274,6 +370,11 @@ function handleFolderNext(path, isSpec, isAll) {
 document.getElementById('folder-next').addEventListener('click', () => {
   const sel = document.querySelector('#folder-list .folder-item.selected');
   if (!sel) return;
+  // If multiple folders selected, use them all
+  if (selectedFolders.size > 1) {
+    handleFolderNext(null, false, false);
+    return;
+  }
   handleFolderNext(sel.dataset.path, sel.dataset.isSpec === 'true', sel.dataset.isAll === 'true');
 });
 document.getElementById('folder-back').addEventListener('click', () => showStep(2));
@@ -283,11 +384,19 @@ function renderSpecList(query, folderFilter) {
   const list = document.getElementById('spec-list');
   list.innerHTML = '';
   const q = query.trim().toLowerCase();
-  const pool = folderFilter
-    ? allSpecs.filter(s => s.folder === folderFilter || s.folder.startsWith(folderFilter + '/'))
+
+  // folderFilter can be a string or array of strings
+  const folders = Array.isArray(folderFilter) ? folderFilter : (folderFilter ? [folderFilter] : []);
+  const pool = folders.length > 0
+    ? allSpecs.filter(s => folders.some(f => s.folder === f || s.folder.startsWith(f + '/')))
     : allSpecs;
 
-  if (!q) addSpecRow(list, selectedFolder, '📁 Run entire folder', selectedFolder, '', true, true, '');
+  if (!q) {
+    const label = folders.length > 1
+      ? `📁 Run all ${folders.length} selected folders`
+      : `📁 Run entire folder`;
+    addSpecRow(list, folders.join(','), label, folders.join(', '), '', true, true, '');
+  }
 
   const filtered = q
     ? pool.filter(s => s.name.toLowerCase().includes(q) || s.folder.toLowerCase().includes(q))
@@ -387,6 +496,8 @@ document.getElementById('run-btn').addEventListener('click', async () => {
   const cmdParts = ['caffeinate -i npx playwright test', ...specPaths];
   if (headed || debug) cmdParts.push('--headed');
   if (debug) cmdParts.push('--debug');
+  cmdParts.push(`--workers=${workers}`);
+  cmdParts.push(`--retries=${retries}`);
   const cmdLine = cmdParts.join(' ');
 
   const cmdBlock = document.createElement('div');
@@ -410,6 +521,7 @@ document.getElementById('run-btn').addEventListener('click', async () => {
   });
 
   window.api.tests.onDone(async ({ exitCode }) => {
+    setRunning(false);
     document.getElementById('terminal-footer').style.display = 'flex';
     document.getElementById('stop-btn').style.display = 'none';
 
@@ -435,11 +547,13 @@ document.getElementById('run-btn').addEventListener('click', async () => {
     window.api.notify(exitCode === 0 ? 'Tests Passed' : 'Tests Finished', notifyMsg);
   });
 
+  setRunning(true);
   await window.api.tests.run({ specPaths, env, headed: browser !== 'headless', debug: browser === 'debug', workers, retries });
 });
 
 document.getElementById('stop-btn').addEventListener('click', async () => {
   await window.api.tests.stop();
+  setRunning(false);
   document.getElementById('stop-btn').style.display = 'none';
   document.getElementById('terminal-footer').style.display = 'flex';
   document.getElementById('run-summary').innerHTML = '<span class="summary-fail">■ Stopped by user</span>';
