@@ -499,7 +499,7 @@ function initProgress(specPaths) {
   for (const sp of specPaths) {
     for (const s of specsMatchingPath(sp)) {
       progressTotal += (s.count || 0);
-      if (!(s.path in specTrackerMap)) specTrackerMap[s.path] = 'pending';
+      if (!(s.path in specTrackerMap)) specTrackerMap[s.path] = 'running'; // yellow pulse from start
     }
   }
 
@@ -544,11 +544,12 @@ function updateProgressUI() {
   const label = document.getElementById('progress-label');
   if (!fill || !label) return;
 
-  const pct = progressTotal > 0 ? Math.round((progressDone / progressTotal) * 100) : 0;
-  fill.style.width = `${Math.min(pct, 100)}%`;
+  const pct = progressTotal > 0 ? Math.min(Math.round((progressDone / progressTotal) * 100), 100) : 0;
+  fill.style.width = `${pct}%`;
   fill.classList.toggle('failing', progressFailed > 0);
 
-  const parts = [`${progressDone} / ${progressTotal} tests`];
+  const done = Math.min(progressDone, progressTotal);
+  const parts = [`${done} / ${progressTotal} tests`];
   if (progressFailed > 0) parts.push(`${progressFailed} ✗`);
   parts.push(`${pct}%`);
   label.textContent = parts.join(' · ');
@@ -562,7 +563,27 @@ function parseProgressLine(line) {
   const totM = clean.match(/Running (\d+) tests? using/);
   if (totM) { progressTotal = parseInt(totM[1]); updateProgressUI(); return; }
 
-  // Result lines contain a spec file path
+  // ── Custom reporter: [trace-screenshot-reporter] Test name → N frames → path
+  // Each such line = one test completed (screenshot/trace saved)
+  if (clean.startsWith('[trace-screenshot-reporter]')) {
+    progressDone = Math.min(progressDone + 1, progressTotal || Infinity);
+    updateProgressUI();
+    return;
+  }
+
+  // ── Playwright failure detail block: "  1) tests/foo/bar.spec.js:10:5 › ..."
+  // This lets us mark individual specs as failed even without ✗ on each line
+  const failDetailM = clean.match(/^\s+\d+\)\s+(tests\/[^\s:]+\.spec\.js)/);
+  if (failDetailM) {
+    const sp = failDetailM[1];
+    if (sp in specTrackerMap) {
+      specTrackerMap[sp] = 'failed';
+      updateSpecChip(sp);
+    }
+    return;
+  }
+
+  // ── Standard reporter result lines (✓ / ✗ / - per test)
   const specM = clean.match(/(tests\/[^\s:›·(]+\.spec\.js)/);
   if (!specM) return;
   const specPath = specM[1].trim();
@@ -577,12 +598,9 @@ function parseProgressLine(line) {
 
   if (isFailed) {
     progressFailed++;
-    specTrackerMap[specPath] = 'failed';          // red — stays red
+    specTrackerMap[specPath] = 'failed';
   } else {
-    // pass or skip — mark as running (yellow pulse) unless already failed
-    if (specTrackerMap[specPath] !== 'failed') {
-      specTrackerMap[specPath] = 'running';
-    }
+    if (specTrackerMap[specPath] !== 'failed') specTrackerMap[specPath] = 'running';
   }
 
   updateProgressUI();
@@ -677,7 +695,9 @@ document.getElementById('run-btn').addEventListener('click', async () => {
 
   window.api.tests.onDone(async ({ exitCode }) => {
     setRunning(false);
-    finaliseProgress(false);   // flip running chips → passed, lock bar at 100%
+    // Delay so any remaining IPC output events (failure detail lines) flush first,
+    // then flip chips: failed ones stay red, running ones become passed.
+    setTimeout(() => finaliseProgress(false), 300);
     document.getElementById('terminal-footer').style.display = 'flex';
     document.getElementById('stop-btn').style.display = 'none';
 
