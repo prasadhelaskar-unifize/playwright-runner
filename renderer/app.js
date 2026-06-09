@@ -11,6 +11,9 @@ let progressDone   = 0;   // tests completed (pass + fail + skip)
 let progressFailed = 0;   // tests that failed
 let specTrackerMap = {};  // relPath → 'pending'|'running'|'passed'|'failed'
 let outputLineBuf  = '';  // buffer for incomplete output lines
+// 'standard' = using ✓/✗ lines; 'trace' = using [trace-screenshot-reporter];
+// null = not yet decided. Standard takes priority to avoid double-counting.
+let progressMode   = null;
 
 function setRunning(val) {
   isRunning = val;
@@ -495,6 +498,7 @@ function initProgress(specPaths) {
   progressFailed = 0;
   specTrackerMap = {};
   outputLineBuf  = '';
+  progressMode   = null;
 
   for (const sp of specPaths) {
     for (const s of specsMatchingPath(sp)) {
@@ -563,16 +567,43 @@ function parseProgressLine(line) {
   const totM = clean.match(/Running (\d+) tests? using/);
   if (totM) { progressTotal = parseInt(totM[1]); updateProgressUI(); return; }
 
+  // ── Standard reporter result lines (✓ / ✗ / - per test) ─────────────────
+  // Checked FIRST — if these appear, we lock into 'standard' mode and ignore
+  // [trace-screenshot-reporter] lines to prevent double-counting.
+  const specM = clean.match(/(tests\/[^\s:›·(]+\.spec\.js)/);
+  if (specM) {
+    const isPassed  = clean.includes('✓');
+    const isFailed  = clean.includes('✗') || clean.includes('×') || clean.includes('✘');
+    const isSkipped = !isPassed && !isFailed && /^\s*-\s+\d+/.test(clean);
+
+    if (isPassed || isFailed || isSkipped) {
+      progressMode = 'standard';   // lock: ignore trace lines from here on
+      progressDone++;
+      const specPath = specM[1].trim();
+      if (isFailed) {
+        progressFailed++;
+        specTrackerMap[specPath] = 'failed';
+      } else {
+        if (specTrackerMap[specPath] !== 'failed') specTrackerMap[specPath] = 'running';
+      }
+      updateProgressUI();
+      updateSpecChip(specPath);
+      return;
+    }
+  }
+
   // ── Custom reporter: [trace-screenshot-reporter] Test name → N frames → path
-  // Each such line = one test completed (screenshot/trace saved)
-  if (clean.startsWith('[trace-screenshot-reporter]')) {
+  // Only used when standard ✓/✗ lines have NOT been seen (progressMode !== 'standard').
+  // Each line = one completed test regardless of pass/fail.
+  if (clean.startsWith('[trace-screenshot-reporter]') && progressMode !== 'standard') {
+    progressMode = 'trace';
     progressDone = Math.min(progressDone + 1, progressTotal || Infinity);
     updateProgressUI();
     return;
   }
 
   // ── Playwright failure detail block: "  1) tests/foo/bar.spec.js:10:5 › ..."
-  // This lets us mark individual specs as failed even without ✗ on each line
+  // Always parsed regardless of mode — marks individual spec chips as failed.
   const failDetailM = clean.match(/^\s+\d+\)\s+(tests\/[^\s:]+\.spec\.js)/);
   if (failDetailM) {
     const sp = failDetailM[1];
@@ -580,31 +611,7 @@ function parseProgressLine(line) {
       specTrackerMap[sp] = 'failed';
       updateSpecChip(sp);
     }
-    return;
   }
-
-  // ── Standard reporter result lines (✓ / ✗ / - per test)
-  const specM = clean.match(/(tests\/[^\s:›·(]+\.spec\.js)/);
-  if (!specM) return;
-  const specPath = specM[1].trim();
-
-  const isPassed  = clean.includes('✓');
-  const isFailed  = clean.includes('✗') || clean.includes('×') || clean.includes('✘');
-  const isSkipped = !isPassed && !isFailed && /^\s*-\s+\d+/.test(clean);
-
-  if (!isPassed && !isFailed && !isSkipped) return;
-
-  progressDone++;
-
-  if (isFailed) {
-    progressFailed++;
-    specTrackerMap[specPath] = 'failed';
-  } else {
-    if (specTrackerMap[specPath] !== 'failed') specTrackerMap[specPath] = 'running';
-  }
-
-  updateProgressUI();
-  updateSpecChip(specPath);
 }
 
 /** Feed a raw output chunk through the line-by-line parser. */
