@@ -592,10 +592,29 @@ function parseProgressLine(line) {
     }
   }
 
-  // ── Custom reporter: [trace-screenshot-reporter] Test name → N frames → path
-  // Only used when standard ✓/✗ lines have NOT been seen (progressMode !== 'standard').
-  // Each line = one completed test regardless of pass/fail.
-  if (clean.startsWith('[trace-screenshot-reporter]') && progressMode !== 'standard') {
+  // ── Custom reporter: [test-progress] passed|failed|timedOut tests/foo.spec.js
+  // Emitted by custom-reporter.js onTestEnd for every final test attempt.
+  // Takes priority over [trace-screenshot-reporter] (which only fires on failure).
+  const tpM = clean.match(/^\[test-progress\]\s+(passed|failed|timedOut|interrupted)\s+(tests\/[^\s]+\.spec\.js)/);
+  if (tpM && progressMode !== 'standard') {
+    progressMode = 'custom';
+    progressDone = Math.min(progressDone + 1, progressTotal || Infinity);
+    const tpStatus = tpM[1];
+    const tpSpec   = tpM[2];
+    if (tpStatus !== 'passed') {
+      progressFailed++;
+      specTrackerMap[tpSpec] = 'failed';
+    } else {
+      if (specTrackerMap[tpSpec] !== 'failed') specTrackerMap[tpSpec] = 'running';
+    }
+    updateProgressUI();
+    updateSpecChip(tpSpec);
+    return;
+  }
+
+  // ── [trace-screenshot-reporter] fallback (fires only on failure, retain-on-failure)
+  // Used only when neither standard ✓/✗ nor [test-progress] lines appear.
+  if (clean.startsWith('[trace-screenshot-reporter]') && progressMode !== 'standard' && progressMode !== 'custom') {
     progressMode = 'trace';
     progressDone = Math.min(progressDone + 1, progressTotal || Infinity);
     updateProgressUI();
