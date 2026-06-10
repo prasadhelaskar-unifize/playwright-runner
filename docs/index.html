@@ -92,6 +92,69 @@
 
   footer { border-top: 1px solid var(--border); padding: 40px 0; text-align: center; color: var(--muted); font-size: 13px; }
   footer a { color: var(--muted); }
+
+  /* Scroll progress bar */
+  #scroll-progress { position: fixed; top: 0; left: 0; height: 3px; width: 0; z-index: 200; background: linear-gradient(90deg, var(--accent), var(--purple)); box-shadow: 0 0 10px rgba(99,102,241,0.7); transition: width 0.08s linear; pointer-events: none; }
+
+  /* Click spotlight — blur overlay + highlighted element */
+  #blur-overlay { position: fixed; inset: 0; z-index: 1000; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); background: rgba(15,17,23,0.35); opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+  #blur-overlay.active { opacity: 1; }
+  .spotlight { position: relative; z-index: 1001; border-radius: 8px; animation: spot-ring 2s ease-out; }
+  @keyframes spot-ring {
+    0%   { box-shadow: 0 0 0 0 rgba(129,140,248,0.9); }
+    25%  { box-shadow: 0 0 0 6px rgba(129,140,248,0.45), 0 0 30px rgba(99,102,241,0.5); }
+    100% { box-shadow: 0 0 0 6px rgba(129,140,248,0), 0 0 30px rgba(99,102,241,0); }
+  }
+  .click-ripple { position: fixed; z-index: 1002; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--accent-h); background: rgba(129,140,248,0.35); transform: translate(-50%, -50%); pointer-events: none; animation: ripple-pop 0.7s ease-out forwards; }
+  @keyframes ripple-pop {
+    0%   { opacity: 1; scale: 0.4; }
+    70%  { opacity: 0.8; scale: 2.6; }
+    100% { opacity: 0; scale: 3.4; }
+  }
+
+  /* Hero terminal demo — mirrors the app's Run Tests screen */
+  .term-demo { max-width: 680px; margin: 44px auto 0; text-align: left; background: #0c0e14; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); overflow: hidden; }
+  .term-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .term-bar .dot { width: 11px; height: 11px; border-radius: 50%; }
+  .term-bar .dot.r { background: #ff5f56; } .term-bar .dot.y { background: #ffbd2e; } .term-bar .dot.g { background: #27c93f; }
+  .term-bar .title { margin: 0 auto; font-size: 12px; color: var(--muted); transform: translateX(-22px); }
+  .term-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+  .term-head .run-status { font-size: 13px; font-weight: 700; }
+  .term-head .cfg { font-size: 12px; color: var(--muted); background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 4px 12px; }
+  .term-body { font-family: var(--mono); font-size: 12px; line-height: 1.7; padding: 14px 16px; height: 218px; overflow: hidden; white-space: pre-wrap; word-break: break-all; }
+  .term-body .ln { display: block; }
+  .term-body .tag { color: var(--muted); }
+  .term-body .ok { color: var(--green); font-weight: 600; }
+  .term-body .fail { color: #ef4444; font-weight: 600; }
+  .term-body .dim { color: var(--muted); }
+  .term-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--border); min-height: 58px; }
+  .term-foot .verdict { font-size: 14px; font-weight: 700; opacity: 0; transition: opacity 0.3s; }
+  .term-foot .verdict.show { opacity: 1; }
+  .term-foot .verdict.pass { color: var(--green); }
+  .term-foot .verdict.fail { color: #ef4444; }
+  .term-foot .open-report { font-size: 13px; font-weight: 700; color: #fff; background: var(--accent); border-radius: 10px; padding: 8px 18px; opacity: 0; transition: opacity 0.3s; }
+  .term-foot .open-report.show { opacity: 1; }
+  /* Copy buttons on code blocks */
+  pre { position: relative; }
+  .copy-btn { position: absolute; top: 8px; right: 8px; font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; opacity: 0; transition: opacity 0.15s, color 0.15s, border-color 0.15s; }
+  pre:hover .copy-btn { opacity: 1; }
+  .copy-btn:hover { color: var(--text); border-color: var(--accent); }
+  .copy-btn.copied { opacity: 1; color: var(--green); border-color: var(--green); }
+
+  /* Hero parallax starfield */
+  .hero { position: relative; }
+  #starfield { position: absolute; inset: -60px 0 0; width: 100%; height: calc(100% + 60px); pointer-events: none; z-index: -1; }
+
+  /* Scroll reveal */
+  .reveal { opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease, transform 0.6s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
+
+  /* Scroll-drawn guiding string */
+  #guide-path { position: absolute; top: 0; left: 0; pointer-events: none; z-index: -1; }
+  #guide-path .line { fill: none; stroke: url(#guide-grad); stroke-width: 2.5; stroke-linecap: round; opacity: 0.6; }
+  #guide-path .line-glow { fill: none; stroke: var(--accent); stroke-width: 8; stroke-linecap: round; opacity: 0.12; filter: blur(4px); }
+  #guide-path .tip { fill: var(--accent-h); filter: drop-shadow(0 0 8px rgba(129,140,248,0.9)); }
 </style>
 </head>
 <body>
@@ -112,6 +175,7 @@
 
 <!-- Hero -->
 <div class="wrap hero" id="download">
+  <canvas id="starfield" aria-hidden="true"></canvas>
   <img class="logo" src="icon.png" alt="Unifize Test Runner" />
   <h1>Run Playwright tests.<br><span class="grad">No terminal required.</span></h1>
   <p class="lead">A native macOS desktop app for running Playwright tests on the Unifize platform — a guided wizard, live output, and one-click HTML reports.</p>
@@ -132,6 +196,22 @@
     </a>
   </div>
   <p class="dl-note">Not sure which Mac you have? Click  → <strong>About This Mac</strong>. "Apple M1/M2/M3" = Apple Silicon. · <a href="https://github.com/prasadhelaskar-unifize/playwright-runner/releases">All releases</a></p>
+
+  <div class="term-demo" aria-hidden="true">
+    <div class="term-bar">
+      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span class="title">Unifize Test Runner</span>
+    </div>
+    <div class="term-head">
+      <span class="run-status" id="term-run-status">Running — prod | 1 spec(s) | 1 worker(s)</span>
+      <span class="cfg">← Configure</span>
+    </div>
+    <div class="term-body" id="term-body"></div>
+    <div class="term-foot">
+      <span class="verdict pass" id="term-verdict">✓ All tests passed</span>
+      <span class="open-report" id="term-open-report">Open Report →</span>
+    </div>
+  </div>
 </div>
 
 <!-- Requirements -->
@@ -238,6 +318,256 @@ npm run build      # build standalone macOS DMG → dist/</code></pre>
     <p>Unifize Test Runner · built by Unifize QA · <a href="https://github.com/prasadhelaskar-unifize/playwright-runner">View on GitHub</a></p>
   </div>
 </footer>
+
+<div id="scroll-progress"></div>
+<div id="blur-overlay"></div>
+
+<svg id="guide-path" aria-hidden="true">
+  <defs>
+    <linearGradient id="guide-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#818cf8" />
+      <stop offset="50%" stop-color="#a855f7" />
+      <stop offset="100%" stop-color="#6366f1" />
+    </linearGradient>
+  </defs>
+  <path class="line-glow" d="" />
+  <path class="line" d="" />
+  <circle class="tip" r="5" cx="-20" cy="-20" />
+</svg>
+
+<script>
+  // Scroll progress bar
+  const progress = document.getElementById('scroll-progress');
+  function updateProgress() {
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    progress.style.width = (max > 0 ? (window.scrollY / max) * 100 : 0) + '%';
+  }
+  window.addEventListener('scroll', updateProgress, { passive: true });
+  window.addEventListener('resize', updateProgress);
+  updateProgress();
+
+  // Click spotlight: ripple at click point, highlight the clicked element,
+  // blur the rest of the page, reset after 2s
+  const overlay = document.getElementById('blur-overlay');
+  let resetTimer = null;
+  let currentSpot = null;
+
+  document.addEventListener('click', (e) => {
+    // ripple marker at the click point
+    const ripple = document.createElement('div');
+    ripple.className = 'click-ripple';
+    ripple.style.left = e.clientX + 'px';
+    ripple.style.top = e.clientY + 'px';
+    document.body.appendChild(ripple);
+    ripple.addEventListener('animationend', () => ripple.remove());
+
+    // pick the nearest meaningful block to spotlight
+    const target = e.target.closest(
+      'a, button, .feature, .stepline, .badge, .dl, pre, tr, h1, h2, h3, p, img, code'
+    ) || e.target;
+    if (target === document.body || target === document.documentElement) return;
+
+    // clear any previous spotlight
+    if (currentSpot) currentSpot.classList.remove('spotlight');
+    clearTimeout(resetTimer);
+
+    currentSpot = target;
+    // re-trigger the ring animation even on repeat clicks
+    void target.offsetWidth;
+    target.classList.add('spotlight');
+    overlay.classList.add('active');
+
+    resetTimer = setTimeout(() => {
+      overlay.classList.remove('active');
+      if (currentSpot) currentSpot.classList.remove('spotlight');
+      currentSpot = null;
+    }, 2000);
+  });
+
+  // Guiding string: a curved line weaving between sections, drawn as you scroll
+  const guideSvg = document.getElementById('guide-path');
+  const guideLine = guideSvg.querySelector('.line');
+  const guideGlow = guideSvg.querySelector('.line-glow');
+  const guideTip = guideSvg.querySelector('.tip');
+  let guideLen = 0;
+
+  function buildGuidePath() {
+    const docW = document.documentElement.clientWidth;
+    const docH = document.documentElement.scrollHeight;
+    guideSvg.setAttribute('width', docW);
+    guideSvg.setAttribute('height', docH);
+    guideSvg.setAttribute('viewBox', `0 0 ${docW} ${docH}`);
+
+    const cx = docW / 2;
+    const amp = Math.min(docW * 0.36, 420);
+
+    // waypoints: hero logo, then each section heading, alternating sides
+    const anchors = [document.querySelector('.hero .logo'), ...document.querySelectorAll('section h2'), document.querySelector('footer p')];
+    const pts = anchors.filter(Boolean).map((el, i) => {
+      const r = el.getBoundingClientRect();
+      const y = r.top + window.scrollY + r.height / 2;
+      const x = i === 0 ? cx : cx + (i % 2 ? -amp : amp);
+      return { x, y };
+    });
+    if (pts.length < 2) return;
+
+    // smooth S-curves between consecutive points
+    let d = `M ${pts[0].x} ${pts[0].y}`;
+    for (let i = 1; i < pts.length; i++) {
+      const p0 = pts[i - 1], p1 = pts[i];
+      const midY = (p0.y + p1.y) / 2;
+      d += ` C ${p0.x} ${midY}, ${p1.x} ${midY}, ${p1.x} ${p1.y}`;
+    }
+    guideLine.setAttribute('d', d);
+    guideGlow.setAttribute('d', d);
+    guideLen = guideLine.getTotalLength();
+    guideLine.style.strokeDasharray = guideLen;
+    guideGlow.style.strokeDasharray = guideLen;
+    drawGuide();
+  }
+
+  function drawGuide() {
+    if (!guideLen) return;
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    // tip of the string leads ~70% down the current viewport
+    const progress = Math.min(1, Math.max(0.02, max > 0 ? (window.scrollY + window.innerHeight * 0.7) / document.documentElement.scrollHeight : 1));
+    const drawn = guideLen * progress;
+    guideLine.style.strokeDashoffset = guideLen - drawn;
+    guideGlow.style.strokeDashoffset = guideLen - drawn;
+    const tip = guideLine.getPointAtLength(drawn);
+    guideTip.setAttribute('cx', tip.x);
+    guideTip.setAttribute('cy', tip.y);
+  }
+
+  window.addEventListener('scroll', drawGuide, { passive: true });
+  window.addEventListener('resize', buildGuidePath);
+  window.addEventListener('load', buildGuidePath);
+  buildGuidePath();
+
+  // Hero terminal demo: replays the app's real Run Tests output, loops forever
+  const termBody = document.getElementById('term-body');
+  const termVerdict = document.getElementById('term-verdict');
+  const termOpenReport = document.getElementById('term-open-report');
+  const termRunStatus = document.getElementById('term-run-status');
+
+  const SPEC = 'tests/regression/manage-view/process-builder-privacy.spec.js';
+  const progressLine = (name) =>
+    `<span class="tag">[test-progress]</span> <span class="ok">passed</span> <span class="dim">${SPEC} ›</span> ${name}`;
+
+  const termScript = [
+    { html: '<span class="tag">[playwright]</span> PLAYWRIGHT_ENV=prod → support/env <span class="dim">(BASE_URL=https://app.unifize.com)</span>', delay: 500 },
+    { html: '<span class="dim">Using unique run ID: 93580_1781079856834_6c7122bf (PID: 93580)</span>', delay: 380 },
+    { html: '<span class="dim">Created run directory: ~/playwright-tests/reports/2026-06-10/run_20</span>', delay: 380 },
+    { html: '<span class="dim">Custom reporter onBegin called</span>', delay: 650 },
+    { html: progressLine('Verify that the user is able to access the Privacy Settings section'), delay: 850 },
+    { html: progressLine('Verify that the "Make Private" toggle button is functional'), delay: 850 },
+    { html: progressLine('Verify that enabling "Make Private" displays "Hide on Chat" and "Hide Everything" options'), delay: 900 },
+    { html: progressLine('Verify that the user can select either "Hide on Chat" or "Hide Everything"'), delay: 850 },
+    { html: progressLine('Verify that users can add individuals to a whitelist for access permissions'), delay: 900 },
+  ];
+
+  async function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  async function runTermDemo() {
+    while (true) {
+      termBody.innerHTML = '';
+      termVerdict.classList.remove('show');
+      termOpenReport.classList.remove('show');
+      termRunStatus.textContent = 'Running — prod | 1 spec(s) | 1 worker(s)';
+      for (const step of termScript) {
+        const ln = document.createElement('span');
+        ln.className = 'ln';
+        ln.innerHTML = step.html;
+        termBody.appendChild(ln);
+        termBody.scrollTop = termBody.scrollHeight;
+        await wait(step.delay);
+      }
+      termRunStatus.textContent = 'Finished — prod | 1 spec(s) | 1 worker(s)';
+      termVerdict.classList.add('show');
+      termOpenReport.classList.add('show');
+      await wait(4500);
+    }
+  }
+  runTermDemo();
+
+  // Scroll reveal: fade/slide sections in as they enter the viewport
+  const revealEls = document.querySelectorAll(
+    'section h2, section .sub, .feature, .stepline, .tbl-wrap, section pre, .callout'
+  );
+  revealEls.forEach((el, i) => {
+    el.classList.add('reveal');
+    el.style.transitionDelay = (i % 6) * 0.07 + 's';
+  });
+  const ro = new IntersectionObserver((entries) => {
+    for (const en of entries) {
+      if (en.isIntersecting) { en.target.classList.add('in'); ro.unobserve(en.target); }
+    }
+  }, { threshold: 0.15 });
+  revealEls.forEach(el => ro.observe(el));
+  // reveal changes element positions' timing, so rebuild the guide string after fonts/layout settle
+  setTimeout(buildGuidePath, 300);
+
+  // Copy buttons on every code block
+  document.querySelectorAll('pre').forEach(pre => {
+    const btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await navigator.clipboard.writeText(pre.querySelector('code').innerText.trim());
+      btn.textContent = 'Copied ✓';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+    });
+    pre.appendChild(btn);
+  });
+
+  // Hero parallax starfield: three depth layers drifting slowly, shifting with scroll
+  const starCanvas = document.getElementById('starfield');
+  const sctx = starCanvas.getContext('2d');
+  let stars = [];
+
+  function initStars() {
+    const r = starCanvas.parentElement.getBoundingClientRect();
+    starCanvas.width = r.width * devicePixelRatio;
+    starCanvas.height = (r.height + 60) * devicePixelRatio;
+    sctx.scale(devicePixelRatio, devicePixelRatio);
+    const w = r.width, h = r.height + 60;
+    stars = Array.from({ length: 110 }, () => {
+      const depth = Math.random();          // 0 = far, 1 = near
+      return {
+        x: Math.random() * w, y: Math.random() * h,
+        size: 0.5 + depth * 1.6,
+        speed: 0.02 + depth * 0.08,         // slow horizontal drift
+        parallax: 0.05 + depth * 0.25,      // scroll shift factor
+        tw: Math.random() * Math.PI * 2,    // twinkle phase
+        alpha: 0.15 + depth * 0.5,
+      };
+    });
+  }
+
+  function drawStars(t) {
+    const w = starCanvas.width / devicePixelRatio, h = starCanvas.height / devicePixelRatio;
+    sctx.clearRect(0, 0, w, h);
+    for (const s of stars) {
+      s.x += s.speed;
+      if (s.x > w) s.x = 0;
+      const twinkle = 0.7 + 0.3 * Math.sin(t / 900 + s.tw);
+      const y = s.y - window.scrollY * s.parallax;
+      sctx.globalAlpha = s.alpha * twinkle;
+      sctx.fillStyle = '#a5b4fc';
+      sctx.beginPath();
+      sctx.arc(s.x, ((y % h) + h) % h, s.size, 0, Math.PI * 2);
+      sctx.fill();
+    }
+    if (!reducedMotion) requestAnimationFrame(drawStars);
+  }
+
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  initStars();
+  window.addEventListener('resize', initStars);
+  requestAnimationFrame(drawStars);
+</script>
 
 </body>
 </html>
