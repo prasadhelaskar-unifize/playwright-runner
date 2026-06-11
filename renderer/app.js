@@ -536,10 +536,20 @@ function renderSpecTracker() {
   }
 }
 
-/** Update a single spec chip's visual state. */
+/** Update a single spec chip's visual state and scroll it to horizontal center. */
 function updateSpecChip(specPath) {
   const chip = document.querySelector(`.spec-chip[data-spec-path="${CSS.escape(specPath)}"]`);
-  if (chip) chip.className = `spec-chip ${specTrackerMap[specPath] || 'pending'}`;
+  if (!chip) return;
+  chip.className = `spec-chip ${specTrackerMap[specPath] || 'pending'}`;
+
+  // Scroll the tracker so this chip sits in the horizontal center
+  const tracker = document.getElementById('spec-tracker');
+  if (tracker) {
+    const chipLeft   = chip.offsetLeft;
+    const chipWidth  = chip.offsetWidth;
+    const trackWidth = tracker.clientWidth;
+    tracker.scrollTo({ left: chipLeft - (trackWidth / 2) + (chipWidth / 2), behavior: 'smooth' });
+  }
 }
 
 /** Re-paint the progress bar and label. */
