@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Unifize Test Runner — Download</title>
+<meta name="description" content="Embeddable download card for the Unifize Test Runner macOS app." />
+<link rel="icon" href="icon.png" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --brand: #0B6DFF; --brand-h: #2f86ff;
+    --card: #ffffff; --text: #0f172a; --muted: #64748b;
+    --border: #e2e8f0; --surface: #f8fafc;
+    --radius: 16px;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --card: #181c27; --text: #e2e8f0; --muted: #94a3b8;
+      --border: #2a2f42; --surface: #1e2333;
+    }
+  }
+  html, body { background: transparent; }
+  body {
+    font-family: var(--font); color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    display: flex; justify-content: center;
+    padding: 12px;
+  }
+
+  .card {
+    width: 100%; max-width: 380px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: 0 8px 30px rgba(15,23,42,0.08);
+  }
+
+  .head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+  .head img { width: 52px; height: 52px; border-radius: 12px; flex-shrink: 0; }
+  .head .title { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.25; }
+  .head .ver { display: inline-block; margin-top: 3px; font-size: 11px; font-weight: 600;
+    color: var(--brand); background: rgba(11,109,255,0.1); border-radius: 20px; padding: 2px 9px; }
+
+  .lead { font-size: 13.5px; color: var(--muted); line-height: 1.55; margin-bottom: 18px; }
+
+  .downloads { display: flex; flex-direction: column; gap: 10px; }
+  .dl {
+    display: flex; flex-direction: column; align-items: center; gap: 1px;
+    padding: 12px 16px; border-radius: 12px; font-weight: 600;
+    text-decoration: none; transition: transform .12s, background .12s, border-color .12s;
+  }
+  .dl:hover { transform: translateY(-1px); }
+  .dl .big { font-size: 14px; }
+  .dl .small { font-size: 11px; font-weight: 500; opacity: 0.85; }
+  .dl.primary { background: var(--brand); color: #fff; box-shadow: 0 6px 18px rgba(11,109,255,0.35); }
+  .dl.primary:hover { background: var(--brand-h); }
+  .dl.secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+  .dl.secondary:hover { border-color: var(--brand); }
+
+  .foot { display: flex; align-items: center; justify-content: space-between;
+    margin-top: 16px; font-size: 11.5px; color: var(--muted); }
+  .foot a { color: var(--brand); text-decoration: none; font-weight: 600; }
+  .foot a:hover { text-decoration: underline; }
+  .foot .os { display: flex; align-items: center; gap: 5px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="head">
+      <img src="icon.png" alt="Unifize Test Runner" />
+      <div>
+        <div class="title">Unifize Test Runner</div>
+        <span class="ver">v1.0.0 · macOS 11+</span>
+      </div>
+    </div>
+
+    <p class="lead">Run Playwright tests on the Unifize platform — a guided wizard, live output and one-click HTML reports. No terminal required.</p>
+
+    <div class="downloads">
+      <a class="dl primary" target="_blank" rel="noopener"
+         href="https://github.com/prasadhelaskar-unifize/playwright-runner/releases/latest/download/Unifize.Test.Runner-1.0.0-arm64.dmg">
+        <span class="big">↓ Download for Mac</span>
+        <span class="small">Apple Silicon · M1 / M2 / M3</span>
+      </a>
+      <a class="dl secondary" target="_blank" rel="noopener"
+         href="https://github.com/prasadhelaskar-unifize/playwright-runner/releases/latest/download/Unifize.Test.Runner-1.0.0.dmg">
+        <span class="big">↓ Download for Mac</span>
+        <span class="small">Intel · x64</span>
+      </a>
+    </div>
+
+    <div class="foot">
+      <span class="os">🖥 Apple Silicon &amp; Intel</span>
+      <a target="_blank" rel="noopener"
+         href="https://prasadhelaskar-unifize.github.io/playwright-runner/">Learn more →</a>
+    </div>
+  </div>
+
+  <script>
+    // Auto-resize: tell the host page how tall the card is so the iframe can
+    // size to content. Host listens for { type:'unifize-embed-height', height }.
+    function postHeight() {
+      var h = document.querySelector('.card').getBoundingClientRect().height + 24;
+      parent.postMessage({ type: 'unifize-embed-height', height: Math.ceil(h) }, '*');
+    }
+    window.addEventListener('load', postHeight);
+    window.addEventListener('resize', postHeight);
+  </script>
+</body>
+</html>
