@@ -16,8 +16,11 @@ Source: [`embed.html`](embed.html)
 - Both download buttons — **Apple Silicon** and **Intel** — opening in a new tab
 - A **Learn more →** link back to the full landing page
 
-It always points at `releases/latest/download/…`, so the download links keep working
-across releases without editing the widget.
+On load it queries the [GitHub Releases API](https://api.github.com/repos/prasadhelaskar-unifize/playwright-runner/releases/latest)
+and rewrites the version badge and both download links to the **latest published
+release** — so publishing a new release on GitHub updates the widget automatically,
+with no edits. The hard-coded values in the markup are a fallback used only if the
+API is unreachable.
 
 ---
 
@@ -67,11 +70,14 @@ or leaves a gap. Listen for the `unifize-embed-height` message:
 
 ## Maintenance
 
-The version label and DMG filenames are hard-coded to `1.0.0`, matching
-[`index.html`](index.html). When you cut a new release with a different version number,
-bump the version in **both** files:
+The widget pulls the version and download links from the latest GitHub Release at
+runtime, so **no edit is needed when you publish a new release** — just make sure the
+release has two `.dmg` assets and the Apple Silicon one has `arm64` in its filename.
 
-| File | What to update |
-|------|----------------|
-| [`embed.html`](embed.html) | `v1.0.0` badge text + `…-1.0.0-arm64.dmg` / `…-1.0.0.dmg` URLs |
-| [`index.html`](index.html) | `v1.0.0` badge + the same two DMG URLs |
+The only hard-coded values are the fallback `href`/badge in the markup, used when the
+GitHub API can't be reached (e.g. rate limiting — unauthenticated calls are limited to
+60/hour per IP). Refresh those occasionally so the fallback isn't wildly out of date.
+
+> Note: the full landing page ([`index.html`](index.html)) still hard-codes the version
+> and DMG URLs. Bump those there on each release, or port this same auto-fetch script
+> over to it.

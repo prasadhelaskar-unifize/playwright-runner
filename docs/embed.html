@@ -73,19 +73,19 @@
       <img src="icon.png" alt="Unifize Test Runner" />
       <div>
         <div class="title">Unifize Test Runner</div>
-        <span class="ver">v1.0.0 · macOS 11+</span>
+        <span class="ver" id="ver">v1.0.0 · macOS 11+</span>
       </div>
     </div>
 
     <p class="lead">Run Playwright tests on the Unifize platform — a guided wizard, live output and one-click HTML reports. No terminal required.</p>
 
     <div class="downloads">
-      <a class="dl primary" target="_blank" rel="noopener"
+      <a class="dl primary" id="dl-arm" target="_blank" rel="noopener"
          href="https://github.com/prasadhelaskar-unifize/playwright-runner/releases/latest/download/Unifize.Test.Runner-1.0.0-arm64.dmg">
         <span class="big">↓ Download for Mac</span>
         <span class="small">Apple Silicon · M1 / M2 / M3</span>
       </a>
-      <a class="dl secondary" target="_blank" rel="noopener"
+      <a class="dl secondary" id="dl-intel" target="_blank" rel="noopener"
          href="https://github.com/prasadhelaskar-unifize/playwright-runner/releases/latest/download/Unifize.Test.Runner-1.0.0.dmg">
         <span class="big">↓ Download for Mac</span>
         <span class="small">Intel · x64</span>
@@ -100,6 +100,27 @@
   </div>
 
   <script>
+    // Pull the latest published release from the GitHub API so the version
+    // badge and both download links track GitHub Releases automatically.
+    // The hard-coded href/version above act as a fallback if the API fails.
+    (function () {
+      var REPO = 'prasadhelaskar-unifize/playwright-runner';
+      fetch('https://api.github.com/repos/' + REPO + '/releases/latest', {
+        headers: { Accept: 'application/vnd.github+json' }
+      })
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function (rel) {
+          var tag = (rel.tag_name || '').replace(/^v/, '');
+          if (tag) document.getElementById('ver').textContent = 'v' + tag + ' · macOS 11+';
+          var dmgs = (rel.assets || []).filter(function (a) { return /\.dmg$/i.test(a.name); });
+          var arm = dmgs.find(function (a) { return /arm64|aarch64/i.test(a.name); });
+          var intel = dmgs.find(function (a) { return !/arm64|aarch64/i.test(a.name); });
+          if (arm) document.getElementById('dl-arm').href = arm.browser_download_url;
+          if (intel) document.getElementById('dl-intel').href = intel.browser_download_url;
+        })
+        .catch(function () { /* keep the hard-coded fallback links */ });
+    })();
+
     // Auto-resize: tell the host page how tall the card is so the iframe can
     // size to content. Host listens for { type:'unifize-embed-height', height }.
     function postHeight() {
