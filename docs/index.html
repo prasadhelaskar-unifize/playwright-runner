@@ -183,8 +183,8 @@
   // Apply saved theme before first paint to avoid a flash
   try {
     document.documentElement.setAttribute('data-theme',
-      localStorage.getItem('theme') === 'light' ? 'light' : 'dark');
-  } catch (_) { document.documentElement.setAttribute('data-theme', 'dark'); }
+      localStorage.getItem('theme') === 'dark' ? 'dark' : 'light');
+  } catch (_) { document.documentElement.setAttribute('data-theme', 'light'); }
 </script>
 </head>
 <body>
@@ -383,7 +383,7 @@ npm run build      # build standalone macOS DMG → dist/</code></pre>
   (function initTheme() {
     let saved;
     try { saved = localStorage.getItem('theme'); } catch (_) {}
-    applyTheme(saved === 'light' ? 'light' : 'dark');
+    applyTheme(saved === 'dark' ? 'dark' : 'light');
   })();
   document.getElementById('themeToggle').addEventListener('click', () => {
     const current = document.documentElement.getAttribute('data-theme');

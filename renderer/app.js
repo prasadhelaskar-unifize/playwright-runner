@@ -34,7 +34,7 @@ function applyTheme(theme) {
 (function initTheme() {
   let saved;
   try { saved = localStorage.getItem('theme'); } catch (_) {}
-  applyTheme(saved === 'light' ? 'light' : 'dark');
+  applyTheme(saved === 'dark' ? 'dark' : 'light');
 })();
 document.getElementById('themeToggle').addEventListener('click', () => {
   const current = document.documentElement.getAttribute('data-theme');
