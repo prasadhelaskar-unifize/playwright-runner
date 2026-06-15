@@ -8,33 +8,47 @@
 <link rel="icon" href="icon.png" />
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
+  :root, :root[data-theme="dark"] {
     --bg: #0f1117; --surface: #181c27; --surface2: #1e2333;
     --border: #2a2f42; --text: #e2e8f0; --muted: #64748b;
     --accent: #6366f1; --accent-h: #818cf8;
     --green: #22c55e; --blue: #3b82f6; --purple: #a855f7; --yellow: #f59e0b;
+    --header-bg: rgba(15,17,23,0.85); --code-text: #c7d2fe;
     --radius: 12px;
     --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --mono: 'SF Mono', ui-monospace, 'Cascadia Code', Menlo, monospace;
   }
+  :root[data-theme="light"] {
+    --bg: #f4f5f8; --surface: #ffffff; --surface2: #eef0f5;
+    --border: #d8dce6; --text: #1e2230; --muted: #6b7280;
+    --accent: #6366f1; --accent-h: #4f46e5;
+    --green: #16a34a; --blue: #2563eb; --purple: #9333ea; --yellow: #d97706;
+    --header-bg: rgba(244,245,248,0.85); --code-text: #4f46e5;
+  }
   html { scroll-behavior: smooth; }
+  html { transition: background 0.2s ease, color 0.2s ease; }
   body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
   a { color: var(--accent-h); text-decoration: none; }
   a:hover { text-decoration: underline; }
   .wrap { max-width: 920px; margin: 0 auto; padding: 0 24px; }
-  code { font-family: var(--mono); font-size: 0.86em; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; color: #c7d2fe; }
+  code { font-family: var(--mono); font-size: 0.86em; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; color: var(--code-text); }
   pre { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; overflow-x: auto; margin: 14px 0; }
   pre code { background: none; border: none; padding: 0; color: var(--text); }
 
   /* Header */
-  header { position: sticky; top: 0; z-index: 50; background: rgba(15,17,23,0.85); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+  header { position: sticky; top: 0; z-index: 50; background: var(--header-bg); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
   .nav { display: flex; align-items: center; gap: 10px; height: 60px; }
   .nav img { width: 28px; height: 28px; border-radius: 7px; }
   .nav .name { font-weight: 700; font-size: 15px; }
-  .nav .links { margin-left: auto; display: flex; gap: 22px; }
+  .nav .links { margin-left: auto; display: flex; align-items: center; gap: 22px; }
   .nav .links a { color: var(--muted); font-size: 14px; font-weight: 500; }
   .nav .links a:hover { color: var(--text); text-decoration: none; }
-  @media (max-width: 640px) { .nav .links { display: none; } }
+  @media (max-width: 640px) { .nav .links a { display: none; } }
+
+  /* Theme toggle */
+  .theme-toggle { display: inline-flex; align-items: center; gap: 7px; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; color: var(--text); font-family: var(--font); font-size: 13px; font-weight: 600; padding: 6px 13px; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+  .theme-toggle:hover { border-color: var(--accent); }
+  .theme-toggle .ico { font-size: 14px; line-height: 1; }
 
   /* Hero */
   .hero { text-align: center; padding: 80px 0 64px; }
@@ -134,6 +148,15 @@
   .term-foot .verdict.fail { color: #ef4444; }
   .term-foot .open-report { font-size: 13px; font-weight: 700; color: #fff; background: var(--accent); border-radius: 10px; padding: 8px 18px; opacity: 0; transition: opacity 0.3s; }
   .term-foot .open-report.show { opacity: 1; }
+  /* Keep the terminal demo dark regardless of page theme */
+  :root[data-theme="light"] .term-bar,
+  :root[data-theme="light"] .term-head .cfg { background: #1e2333; border-color: #2a2f42; }
+  :root[data-theme="light"] .term-head,
+  :root[data-theme="light"] .term-foot { border-color: #2a2f42; }
+  :root[data-theme="light"] .term-bar .title,
+  :root[data-theme="light"] .term-head .cfg { color: #94a3b8; }
+  :root[data-theme="light"] .term-body,
+  :root[data-theme="light"] .term-head .run-status { color: #e2e8f0; }
   /* Copy buttons on code blocks */
   pre { position: relative; }
   .copy-btn { position: absolute; top: 8px; right: 8px; font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; opacity: 0; transition: opacity 0.15s, color 0.15s, border-color 0.15s; }
@@ -156,6 +179,13 @@
   #guide-path .line-glow { fill: none; stroke: var(--accent); stroke-width: 8; stroke-linecap: round; opacity: 0.12; filter: blur(4px); }
   #guide-path .tip { fill: var(--accent-h); filter: drop-shadow(0 0 8px rgba(129,140,248,0.9)); }
 </style>
+<script>
+  // Apply saved theme before first paint to avoid a flash
+  try {
+    document.documentElement.setAttribute('data-theme',
+      localStorage.getItem('theme') === 'light' ? 'light' : 'dark');
+  } catch (_) { document.documentElement.setAttribute('data-theme', 'dark'); }
+</script>
 </head>
 <body>
 
@@ -169,6 +199,10 @@
       <a href="#usage">Usage</a>
       <a href="#features">Features</a>
       <a href="https://github.com/prasadhelaskar-unifize/playwright-runner">GitHub</a>
+      <button class="theme-toggle" id="themeToggle" title="Switch theme" aria-label="Switch theme">
+        <span class="ico" id="themeToggleIcon">🌙</span>
+        <span id="themeToggleLabel">Night</span>
+      </button>
     </nav>
   </div>
 </header>
@@ -336,6 +370,24 @@ npm run build      # build standalone macOS DMG → dist/</code></pre>
 </svg>
 
 <script>
+  // Theme (day / night)
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const isLight = theme === 'light';
+    document.getElementById('themeToggleIcon').textContent = isLight ? '☀️' : '🌙';
+    document.getElementById('themeToggleLabel').textContent = isLight ? 'Day' : 'Night';
+    try { localStorage.setItem('theme', theme); } catch (_) {}
+  }
+  (function initTheme() {
+    let saved;
+    try { saved = localStorage.getItem('theme'); } catch (_) {}
+    applyTheme(saved === 'light' ? 'light' : 'dark');
+  })();
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme');
+    applyTheme(current === 'light' ? 'dark' : 'light');
+  });
+
   // Scroll progress bar
   const progress = document.getElementById('scroll-progress');
   function updateProgress() {
