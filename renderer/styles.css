@@ -1,13 +1,25 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-:root {
+:root, :root[data-theme="dark"] {
   --bg: #0f1117; --surface: #181c27; --surface2: #1e2333;
   --border: #2a2f42; --text: #e2e8f0; --muted: #64748b;
   --accent: #6366f1; --accent-h: #818cf8;
   --green: #22c55e; --red: #ef4444; --yellow: #f59e0b;
   --blue: #3b82f6; --purple: #a855f7;
+  --term-text: #c9d1d9; --warn-bg: #1a1a2e;
   --radius: 10px; --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
+
+:root[data-theme="light"] {
+  --bg: #f4f5f8; --surface: #ffffff; --surface2: #eef0f5;
+  --border: #d8dce6; --text: #1e2230; --muted: #6b7280;
+  --accent: #6366f1; --accent-h: #4f46e5;
+  --green: #16a34a; --red: #dc2626; --yellow: #d97706;
+  --blue: #2563eb; --purple: #9333ea;
+  --term-text: #1e2230; --warn-bg: #fff8e6;
+}
+
+html { transition: background 0.2s ease, color 0.2s ease; }
 
 html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; }
 
@@ -31,6 +43,9 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .repo-path { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; }
 .btn-change-repo { background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 11px; padding: 4px 8px; cursor: pointer; text-align: center; -webkit-app-region: no-drag; transition: color 0.15s, border-color 0.15s; }
 .btn-change-repo:hover { color: var(--text); border-color: var(--accent); }
+.theme-toggle { display: flex; align-items: center; justify-content: center; gap: 7px; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; color: var(--text); font-size: 11px; font-weight: 600; padding: 5px 10px; cursor: pointer; -webkit-app-region: no-drag; transition: border-color 0.15s, background 0.15s; margin-bottom: 2px; }
+.theme-toggle:hover { border-color: var(--accent); background: var(--surface); }
+.theme-toggle-icon { font-size: 13px; line-height: 1; }
 
 /* ── Content ── */
 .content { flex: 1; overflow-y: auto; padding: 32px; display: flex; flex-direction: column; }
@@ -146,7 +161,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .btn-stop { padding: 5px 12px; border-radius: 6px; background: var(--red); color: #fff; border: none; cursor: pointer; font-size: 12px; font-weight: 600; }
 .btn-sm { padding: 5px 12px; border-radius: 6px; background: var(--surface); color: var(--muted); border: 1px solid var(--border); cursor: pointer; font-size: 12px; }
 .btn-sm:hover { color: var(--text); }
-.terminal { flex: 1; overflow-y: auto; padding: 14px 16px; font-family: 'SF Mono', 'Menlo', monospace; font-size: 12px; line-height: 1.6; color: #c9d1d9; white-space: pre-wrap; word-break: break-all; }
+.terminal { flex: 1; overflow-y: auto; padding: 14px 16px; font-family: 'SF Mono', 'Menlo', monospace; font-size: 12px; line-height: 1.6; color: var(--term-text); white-space: pre-wrap; word-break: break-all; }
 
 /* ── Command preview block ── */
 .cmd-preview { background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.3); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px; }
@@ -177,7 +192,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .branch-row.done { border-color: var(--green); } .branch-row.error { border-color: var(--red); }
 .branch-name { font-weight: 600; font-size: 14px; }
 .branch-arrow { color: var(--muted); font-size: 16px; }
-.git-log { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; font-family: 'SF Mono', monospace; font-size: 12px; line-height: 1.6; max-height: 200px; overflow-y: auto; white-space: pre-wrap; color: #c9d1d9; max-width: 600px; }
+.git-log { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; font-family: 'SF Mono', monospace; font-size: 12px; line-height: 1.6; max-height: 200px; overflow-y: auto; white-space: pre-wrap; color: var(--term-text); max-width: 600px; }
 .git-status { margin-top: 10px; font-size: 12px; min-height: 18px; color: var(--muted); }
 
 /* ── Report view ── */
@@ -199,7 +214,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .running-warning {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; gap: 12px;
-  background: #1a1a2e; border: 1.5px solid var(--yellow);
+  background: var(--warn-bg); border: 1.5px solid var(--yellow);
   border-radius: 12px; padding: 12px 18px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.5);
   z-index: 999; max-width: 600px; width: calc(100% - 48px);

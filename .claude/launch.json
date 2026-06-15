@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["http-server", "docs", "-p", "8765", "-c-1"],
       "port": 8765
+    },
+    {
+      "name": "renderer",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["http-server", "renderer", "-p", "8766", "-c-1"],
+      "port": 8766
     }
   ]
 }

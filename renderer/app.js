@@ -21,6 +21,26 @@ function setRunning(val) {
   runNav.classList.toggle('running', val);
 }
 
+// ── Theme (day / night) ───────────────────────────────────
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const isLight = theme === 'light';
+  const icon = document.getElementById('themeToggleIcon');
+  const label = document.getElementById('themeToggleLabel');
+  if (icon) icon.textContent = isLight ? '☀️' : '🌙';
+  if (label) label.textContent = isLight ? 'Day' : 'Night';
+  try { localStorage.setItem('theme', theme); } catch (_) {}
+}
+(function initTheme() {
+  let saved;
+  try { saved = localStorage.getItem('theme'); } catch (_) {}
+  applyTheme(saved === 'light' ? 'light' : 'dark');
+})();
+document.getElementById('themeToggle').addEventListener('click', () => {
+  const current = document.documentElement.getAttribute('data-theme');
+  applyTheme(current === 'light' ? 'dark' : 'light');
+});
+
 // ── Navigation ────────────────────────────────────────────
 document.querySelectorAll('.nav-item').forEach(btn =>
   btn.addEventListener('click', () => handleNavClick(btn.dataset.view))
