@@ -356,6 +356,7 @@ npm run build      # build standalone macOS DMG → dist/</code></pre>
 <div id="scroll-progress"></div>
 <div id="blur-overlay"></div>
 
+<!-- Guiding string temporarily disabled
 <svg id="guide-path" aria-hidden="true">
   <defs>
     <linearGradient id="guide-grad" x1="0" y1="0" x2="0" y2="1">
@@ -368,6 +369,7 @@ npm run build      # build standalone macOS DMG → dist/</code></pre>
   <path class="line" d="" />
   <circle class="tip" r="5" cx="-20" cy="-20" />
 </svg>
+-->
 
 <script>
   // Theme (day / night)
@@ -436,6 +438,7 @@ npm run build      # build standalone macOS DMG → dist/</code></pre>
     }, 2000);
   });
 
+  /* Guiding string temporarily disabled
   // Guiding string: a curved line weaving between sections, drawn as you scroll
   const guideSvg = document.getElementById('guide-path');
   const guideLine = guideSvg.querySelector('.line');
@@ -495,6 +498,7 @@ npm run build      # build standalone macOS DMG → dist/</code></pre>
   window.addEventListener('resize', buildGuidePath);
   window.addEventListener('load', buildGuidePath);
   buildGuidePath();
+  */
 
   // Hero terminal demo: replays the app's real Run Tests output, loops forever
   const termBody = document.getElementById('term-body');
@@ -557,7 +561,7 @@ npm run build      # build standalone macOS DMG → dist/</code></pre>
   }, { threshold: 0.15 });
   revealEls.forEach(el => ro.observe(el));
   // reveal changes element positions' timing, so rebuild the guide string after fonts/layout settle
-  setTimeout(buildGuidePath, 300);
+  // setTimeout(buildGuidePath, 300); // guiding string temporarily disabled
 
   // Copy buttons on every code block
   document.querySelectorAll('pre').forEach(pre => {
