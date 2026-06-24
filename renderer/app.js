@@ -5,6 +5,14 @@
 // ── Execution state ───────────────────────────────────────
 let isRunning      = false;
 
+// ── Test case step state ──────────────────────────────────
+let resolvedSpecPaths = [];   // actual .spec.js paths for step 5
+let specTestData      = [];   // [{ specPath, tests: [{name, modifier}] }]
+let selectedTests     = new Map(); // Map<specPath, Set<testName>>
+
+// ── PDF / Highlight flag (Step 7) ─────────────────────────
+let selectedPdfFlag = null; // 'STITCH_PDF' | 'STITCH_PDF_ONLY' | 'HIGHLIGHT_ONLY' | null
+
 // ── Progress tracking state ───────────────────────────────
 let progressTotal  = 0;   // total tests expected (from scan or Playwright announce)
 let progressDone   = 0;   // tests completed (pass + fail + skip)
@@ -46,14 +54,16 @@ document.querySelectorAll('.nav-item').forEach(btn =>
   btn.addEventListener('click', () => handleNavClick(btn.dataset.view))
 );
 document.querySelectorAll('[data-goto]').forEach(el =>
-  el.addEventListener('click', () => showView(el.dataset.goto))
+  el.addEventListener('click', () => {
+    const target = el.dataset.goto;
+    if (target === 'run' && !isRunning) { showView('run'); showWizard(); }
+    else showView(target);
+  })
 );
 
 function handleNavClick(viewId) {
-  if (isRunning && viewId !== 'run') {
-    showRunningWarning(viewId);
-    return;
-  }
+  if (isRunning && viewId !== 'run') { showRunningWarning(viewId); return; }
+  if (viewId === 'run' && !isRunning) { showView('run'); showWizard(); return; }
   showView(viewId);
 }
 
@@ -142,7 +152,7 @@ function getSelected(groupId) {
 }
 
 bindOptionGroup('env-options',      () => showStep(2));
-bindOptionGroup('browser-options',  () => showStep(6));
+bindOptionGroup('browser-options',  () => showStep(7));
 bindOptionGroup('worker-options',   () => document.getElementById('run-btn').click());
 bindOptionGroup('retry-options',    () => document.getElementById('run-btn').click());
 bindOptionGroup('branch-options',   () => document.getElementById('branch-next').click());
@@ -160,6 +170,7 @@ function showStep(n) {
   document.getElementById(`step-${n}`)?.classList.add('active');
   if (n === 3) setTimeout(() => document.getElementById('folder-search')?.focus(), 50);
   if (n === 4) setTimeout(() => document.getElementById('spec-search')?.focus(), 50);
+  if (n === 5) enterTestCasesStep();
 }
 
 function showWizard() {
@@ -489,14 +500,32 @@ document.getElementById('spec-next').addEventListener('click', () => {
 });
 document.getElementById('spec-back').addEventListener('click', () => { directSpecPath = null; showStep(3); });
 
-// ── Step 5 ────────────────────────────────────────────────
-document.getElementById('browser-next').addEventListener('click', () => showStep(6));
-document.getElementById('browser-back').addEventListener('click', () =>
-  (directSpecPath || skipSpecStep) ? showStep(3) : showStep(4)
-);
+// ── Step 6 (Browser) ─────────────────────────────────────
+document.getElementById('browser-next').addEventListener('click', () => showStep(7));
+document.getElementById('browser-back').addEventListener('click', () => showStep(5));
 
-// ── Step 6 ────────────────────────────────────────────────
-document.getElementById('workers-back').addEventListener('click', () => showStep(5));
+// ── Step 7 (Workers) ─────────────────────────────────────
+document.getElementById('workers-back').addEventListener('click', () => showStep(6));
+
+// ── PDF flags ─────────────────────────────────────────────
+document.getElementById('pdf-flags').querySelectorAll('.flag-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const flag = btn.dataset.flag;
+    if (btn.classList.contains('active')) {
+      btn.classList.remove('active');
+      selectedPdfFlag = null;
+    } else {
+      document.querySelectorAll('#pdf-flags .flag-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedPdfFlag = flag;
+    }
+    // STITCH_PDF covers both — disable the other two when it's selected
+    const bothSelected = selectedPdfFlag === 'STITCH_PDF';
+    document.querySelectorAll('#pdf-flags .flag-btn').forEach(b => {
+      b.disabled = bothSelected && b.dataset.flag !== 'STITCH_PDF';
+    });
+  });
+});
 
 // ── Progress helpers ──────────────────────────────────────
 
@@ -511,8 +540,10 @@ function specsMatchingPath(pathVal) {
   );
 }
 
-/** Set up progress state for the run about to start. */
-function initProgress(specPaths) {
+/** Set up progress state for the run about to start.
+ *  totalOverride: when grep is active, pass the exact selected test count
+ *  so the bar doesn't show the full spec count before Playwright announces its own total. */
+function initProgress(specPaths, totalOverride = null) {
   progressTotal  = 0;
   progressDone   = 0;
   progressFailed = 0;
@@ -522,10 +553,12 @@ function initProgress(specPaths) {
 
   for (const sp of specPaths) {
     for (const s of specsMatchingPath(sp)) {
-      progressTotal += (s.count || 0);
+      if (totalOverride === null) progressTotal += (s.count || 0);
       if (!(s.path in specTrackerMap)) specTrackerMap[s.path] = 'running'; // yellow pulse from start
     }
   }
+
+  if (totalOverride !== null) progressTotal = totalOverride;
 
   // Show spec chips only when ≤ 20 individual files are tracked
   const trackerEl = document.getElementById('spec-tracker');
@@ -691,6 +724,267 @@ function finaliseProgress(stopped = false) {
   updateProgressUI();
 }
 
+// ── Step 5: Test Cases ────────────────────────────────────
+
+function computeResolvedSpecPaths() {
+  if (directSpecPath) return [directSpecPath];
+
+  if (skipSpecStep) {
+    const folder = selectedFolder;
+    if (!folder || folder === 'tests/' || folder === 'tests') return allSpecs.map(s => s.path);
+    const norm = folder.replace(/\/$/, '');
+    return allSpecs
+      .filter(s => s.folder === norm || s.folder.startsWith(norm + '/') || s.path.startsWith(norm + '/'))
+      .map(s => s.path);
+  }
+
+  // Spec list selection
+  const paths = [];
+  for (const item of document.querySelectorAll('#spec-list .spec-item.selected')) {
+    const pathVal = item.dataset.path;
+    if (pathVal.endsWith('.spec.js')) {
+      paths.push(pathVal);
+    } else {
+      pathVal.split(',').map(f => f.trim()).filter(Boolean).forEach(f => {
+        const norm = f.replace(/\/$/, '');
+        allSpecs
+          .filter(s => s.folder === norm || s.folder.startsWith(norm + '/') || s.path.startsWith(norm + '/'))
+          .forEach(s => paths.push(s.path));
+      });
+    }
+  }
+  return [...new Set(paths)];
+}
+
+async function enterTestCasesStep() {
+  resolvedSpecPaths = computeResolvedSpecPaths();
+  specTestData = [];
+  selectedTests.clear();
+
+  const tcList   = document.getElementById('tc-list');
+  const countLbl = document.getElementById('tc-count-label');
+  const badge    = document.getElementById('tc-selection-badge');
+
+  tcList.innerHTML = `<div class="tc-loading">Loading test cases for ${resolvedSpecPaths.length} spec file${resolvedSpecPaths.length !== 1 ? 's' : ''}…</div>`;
+  countLbl.textContent = '';
+  badge.style.display = 'none';
+  document.getElementById('tc-search').value = '';
+  document.getElementById('tc-search-clear').style.display = 'none';
+
+  if (!resolvedSpecPaths.length) {
+    tcList.innerHTML = '<div class="tc-loading">No spec files found.</div>';
+    return;
+  }
+
+  specTestData = await window.api.specs.tests(resolvedSpecPaths);
+
+  // Default: select all non-skip/fixme tests
+  for (const { specPath, tests } of specTestData) {
+    selectedTests.set(specPath, new Set(
+      tests.filter(t => t.modifier !== 'skip' && t.modifier !== 'fixme').map(t => t.name)
+    ));
+  }
+
+  renderTestCases('');
+  updateSelectAllState();
+  updateTcBadge();
+  setTimeout(() => document.getElementById('tc-search')?.focus(), 50);
+}
+
+function getNonSkipTotal() {
+  return specTestData.reduce((sum, { tests }) =>
+    sum + tests.filter(t => t.modifier !== 'skip' && t.modifier !== 'fixme').length, 0);
+}
+
+function getSelectedTcCount() {
+  let n = 0;
+  for (const [, set] of selectedTests) n += set.size;
+  return n;
+}
+
+function updateSelectAllState() {
+  const box = document.getElementById('tc-select-all-check');
+  if (!box) return;
+  const total    = getNonSkipTotal();
+  const selected = getSelectedTcCount();
+  box.classList.remove('checked', 'indeterminate');
+  if (total > 0 && selected === total) box.classList.add('checked');
+  else if (selected > 0)              box.classList.add('indeterminate');
+}
+
+function updateTcBadge() {
+  const badge = document.getElementById('tc-selection-badge');
+  const lbl   = document.getElementById('tc-count-label');
+  const total = getNonSkipTotal(), sel = getSelectedTcCount();
+  if (badge) { badge.textContent = `${sel} / ${total} selected`; badge.style.display = total > 0 ? 'inline-flex' : 'none'; }
+  if (lbl)   lbl.textContent = `${sel} of ${total} runnable tests`;
+}
+
+function updateAccordionCounts() {
+  document.querySelectorAll('.tc-accordion-count[data-spec]').forEach(el => {
+    const d = specTestData.find(x => x.specPath === el.dataset.spec);
+    if (!d) return;
+    const total = d.tests.filter(t => t.modifier !== 'skip' && t.modifier !== 'fixme').length;
+    el.textContent = `${selectedTests.get(d.specPath)?.size ?? 0} / ${total}`;
+  });
+}
+
+function buildGrepPattern() {
+  if (!specTestData.length) return null;
+  const total = getNonSkipTotal(), selected = getSelectedTcCount();
+  if (selected === 0) return '';       // nothing selected
+  if (selected === total) return null; // all selected → no grep needed
+  const names = [];
+  for (const [, set] of selectedTests) for (const n of set) names.push(n);
+  return [...new Set(names)].map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+}
+
+function renderTestCases(query) {
+  const list = document.getElementById('tc-list');
+  list.innerHTML = '';
+  const q = query.trim().toLowerCase();
+
+  if (!specTestData.length) {
+    list.innerHTML = '<div class="tc-loading">No test cases found.</div>';
+    return;
+  }
+
+  const isSingle = specTestData.length === 1;
+  for (const { specPath, tests } of specTestData) {
+    const filtered = q ? tests.filter(t => t.name.toLowerCase().includes(q)) : tests;
+    if (!filtered.length) continue;
+    if (isSingle) {
+      filtered.forEach(t => list.appendChild(createTcItem(specPath, t, q)));
+    } else {
+      list.appendChild(createTcAccordion(specPath, filtered, q));
+    }
+  }
+
+  if (!list.children.length) {
+    const em = document.createElement('div');
+    em.className = 'tc-loading';
+    em.textContent = `No test cases match "${query}"`;
+    list.appendChild(em);
+  }
+}
+
+function createTcItem(specPath, test, query) {
+  const isDisabled = test.modifier === 'skip' || test.modifier === 'fixme';
+  const isSelected = !isDisabled && (selectedTests.get(specPath)?.has(test.name) ?? false);
+
+  const item = document.createElement('div');
+  item.className = ['tc-item', isSelected ? 'selected' : '', isDisabled ? 'disabled' : ''].filter(Boolean).join(' ');
+  item.dataset.specPath = specPath;
+  item.dataset.testName = test.name;
+
+  const check = document.createElement('div');
+  check.className = 'tc-check';
+  item.appendChild(check);
+
+  const nameEl = document.createElement('span');
+  nameEl.className = 'tc-name';
+  nameEl.innerHTML = highlight(test.name, query);
+  item.appendChild(nameEl);
+
+  if (test.modifier) {
+    const mod = document.createElement('span');
+    mod.className = `tc-modifier ${test.modifier}`;
+    mod.textContent = test.modifier;
+    item.appendChild(mod);
+  }
+
+  if (!isDisabled) {
+    item.addEventListener('click', e => {
+      const set = selectedTests.get(specPath) || new Set();
+      if (e.metaKey || e.ctrlKey) {
+        // Cmd+click: toggle this item in multi-select
+        if (set.has(test.name)) { set.delete(test.name); item.classList.remove('selected'); }
+        else                    { set.add(test.name);    item.classList.add('selected'); }
+        selectedTests.set(specPath, set);
+      } else {
+        // Regular click: select only this item
+        for (const [sp] of selectedTests) selectedTests.set(sp, new Set());
+        selectedTests.get(specPath).add(test.name);
+        document.querySelectorAll('.tc-item').forEach(el => el.classList.remove('selected'));
+        item.classList.add('selected');
+      }
+      updateSelectAllState();
+      updateTcBadge();
+      updateAccordionCounts();
+    });
+  }
+
+  return item;
+}
+
+function createTcAccordion(specPath, tests, query) {
+  const d    = specTestData.find(x => x.specPath === specPath);
+  const total = d ? d.tests.filter(t => t.modifier !== 'skip' && t.modifier !== 'fixme').length : 0;
+  const sel   = selectedTests.get(specPath)?.size ?? 0;
+
+  const acc = document.createElement('div');
+  acc.className = 'tc-accordion';
+
+  const header = document.createElement('div');
+  header.className = 'tc-accordion-header';
+  header.innerHTML = `
+    <span class="tc-accordion-arrow">▼</span>
+    <span class="tc-accordion-name">${escapeHtml(specPath.split('/').pop())}</span>
+    <span class="tc-accordion-count" data-spec="${escapeHtml(specPath)}">${sel} / ${total}</span>
+  `;
+  header.addEventListener('click', () => acc.classList.toggle('collapsed'));
+
+  const body = document.createElement('div');
+  body.className = 'tc-accordion-body';
+  tests.forEach(t => body.appendChild(createTcItem(specPath, t, query)));
+
+  acc.appendChild(header);
+  acc.appendChild(body);
+  return acc;
+}
+
+// Select All toggle
+document.getElementById('tc-select-all-check').addEventListener('click', () => {
+  const allSelected = getSelectedTcCount() === getNonSkipTotal();
+  if (allSelected) {
+    for (const [sp] of selectedTests) selectedTests.set(sp, new Set());
+    document.querySelectorAll('.tc-item:not(.disabled)').forEach(el => el.classList.remove('selected'));
+  } else {
+    for (const { specPath, tests } of specTestData) {
+      selectedTests.set(specPath, new Set(
+        tests.filter(t => t.modifier !== 'skip' && t.modifier !== 'fixme').map(t => t.name)
+      ));
+    }
+    document.querySelectorAll('.tc-item:not(.disabled)').forEach(el => el.classList.add('selected'));
+  }
+  updateSelectAllState();
+  updateTcBadge();
+  updateAccordionCounts();
+});
+
+document.getElementById('tc-next').addEventListener('click', () => {
+  if (getSelectedTcCount() === 0) return;
+  showStep(6);
+});
+
+document.getElementById('tc-back').addEventListener('click', () => {
+  (directSpecPath || skipSpecStep) ? showStep(3) : showStep(4);
+});
+
+const tcSearch = document.getElementById('tc-search');
+const tcClear  = document.getElementById('tc-search-clear');
+tcSearch.addEventListener('input', () => {
+  const q = tcSearch.value;
+  tcClear.style.display = q ? 'block' : 'none';
+  renderTestCases(q);
+});
+tcClear.addEventListener('click', () => {
+  tcSearch.value = '';
+  tcClear.style.display = 'none';
+  tcSearch.focus();
+  renderTestCases('');
+});
+
 // ── Run Tests ─────────────────────────────────────────────
 document.getElementById('run-btn').addEventListener('click', async () => {
   const env     = getSelected('env-options')     || 'prod';
@@ -702,30 +996,43 @@ document.getElementById('run-btn').addEventListener('click', async () => {
     : skipSpecStep ? [selectedFolder]
     : [...document.querySelectorAll('#spec-list .spec-item.selected')].map(r => r.dataset.path);
 
+  const grep = buildGrepPattern();
+  if (grep === '') return; // nothing selected in test case step
+
+  const selectedTcCount = getSelectedTcCount();
+  const tcLabel = grep ? ` | ${selectedTcCount} test(s)` : '';
+
   document.getElementById('wizard').style.display = 'none';
   document.getElementById('terminal-panel').style.display = 'flex';
   document.getElementById('terminal-footer').style.display = 'none';
   document.getElementById('stop-btn').style.display = 'inline-block';
   document.getElementById('terminal-title').textContent =
-    `Running — ${env} | ${specPaths.length} spec(s) | ${workers} worker(s)`;
+    `Running — ${env} | ${specPaths.length} spec(s) | ${workers} worker(s)${tcLabel}`;
 
   const output = document.getElementById('terminal-output');
   output.innerHTML = '';
   window.api.tests.offOutput();
   window.api.tests.offDone();
 
-  // Initialise progress tracking for this run
-  initProgress(specPaths);
+  // Initialise progress tracking for this run.
+  // When grep is active the spec file counts are wrong (full file, not filtered),
+  // so pass the actual selected test count so the bar starts correct.
+  initProgress(specPaths, grep ? selectedTcCount : null);
 
   // Show the exact command being run
   const headed = browser !== 'headless';
   const debug  = browser === 'debug';
-  const envLine = `PLAYWRIGHT_ENV=${env} EXECUTION_SETTINGS=1 HEADLESS=${headed ? 'false' : 'true'} WORKERS=${workers} RETRIES=${retries}`;
+  const flagPart = selectedPdfFlag ? ` ${selectedPdfFlag}=1` : '';
+  const envLine = `PLAYWRIGHT_ENV=${env} EXECUTION_SETTINGS=1 HEADLESS=${headed ? 'false' : 'true'} WORKERS=${workers} RETRIES=${retries}${flagPart}`;
   const cmdParts = ['caffeinate -i npx playwright test', ...specPaths];
   if (headed || debug) cmdParts.push('--headed');
   if (debug) cmdParts.push('--debug');
   cmdParts.push(`--workers=${workers}`);
   cmdParts.push(`--retries=${retries}`);
+  if (grep) {
+    const displayGrep = grep.length > 60 ? grep.slice(0, 60) + '…' : grep;
+    cmdParts.push(`--grep "${displayGrep}"`);
+  }
   const cmdLine = cmdParts.join(' ');
 
   const cmdBlock = document.createElement('div');
@@ -780,7 +1087,7 @@ document.getElementById('run-btn').addEventListener('click', async () => {
   });
 
   setRunning(true);
-  await window.api.tests.run({ specPaths, env, headed: browser !== 'headless', debug: browser === 'debug', workers, retries });
+  await window.api.tests.run({ specPaths, env, headed: browser !== 'headless', debug: browser === 'debug', workers, retries, grep: grep ?? undefined, pdfFlag: selectedPdfFlag ?? undefined });
 });
 
 document.getElementById('stop-btn').addEventListener('click', async () => {

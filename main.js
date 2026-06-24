@@ -212,7 +212,31 @@ const VALID_REPORTERS = ['default', 'line', 'dot', 'list'];
 
 // ── IPC — Tests ───────────────────────────────────────────────
 let runningProc = null;
-ipcMain.handle('tests:run', (_, { specPaths, env, headed, debug, workers, retries, reporter }) => {
+// ── IPC — Test cases ──────────────────────────────────────────
+ipcMain.handle('specs:tests', (_, specPaths) => {
+  if (!Array.isArray(specPaths)) return [];
+  const results = [];
+  for (const relPath of specPaths) {
+    let safePath;
+    try { safePath = safeRepoPath(path.join(REPO_DIR, relPath)); } catch { continue; }
+    if (!fs.existsSync(safePath)) continue;
+    let content;
+    try { content = fs.readFileSync(safePath, 'utf8'); } catch { continue; }
+    const tests = [];
+    // Match test[.modifier]('name', ...) and test[.modifier]("name", ...)
+    const re = /^\s*test(\.(skip|fixme|only|fail))?\s*\(\s*(?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)")/gm;
+    let m;
+    while ((m = re.exec(content)) !== null) {
+      const modifier = m[2] || null;
+      const name = (m[3] ?? m[4] ?? '').replace(/\\(['"])/g, '$1');
+      if (name) tests.push({ name, modifier });
+    }
+    results.push({ specPath: relPath, tests });
+  }
+  return results;
+});
+
+ipcMain.handle('tests:run', (_, { specPaths, env, headed, debug, workers, retries, reporter, grep, pdfFlag }) => {
   // Validate each spec path is inside repo
   const safeSpecs = specPaths.map(p => {
     try { return path.relative(REPO_DIR, safeRepoPath(path.join(REPO_DIR, p))); }
@@ -226,6 +250,9 @@ ipcMain.handle('tests:run', (_, { specPaths, env, headed, debug, workers, retrie
   if (debug) npxArgs.push('--debug');
   npxArgs.push(`--workers=${parseInt(workers) || 2}`);
   npxArgs.push(`--retries=${parseInt(retries) || 0}`);
+  if (grep && typeof grep === 'string' && grep.length > 0 && grep.length < 5000) {
+    npxArgs.push('--grep', grep);
+  }
 
   const envVars = {
     ...resolveEnv(),
@@ -235,6 +262,9 @@ ipcMain.handle('tests:run', (_, { specPaths, env, headed, debug, workers, retrie
     WORKERS: String(parseInt(workers) || 2),
     RETRIES: String(parseInt(retries) || 0)
   };
+  if (pdfFlag === 'STITCH_PDF')      envVars.STITCH_PDF      = '1';
+  else if (pdfFlag === 'STITCH_PDF_ONLY') envVars.STITCH_PDF_ONLY = '1';
+  else if (pdfFlag === 'HIGHLIGHT_ONLY')  envVars.HIGHLIGHT_ONLY  = '1';
 
   const npx = findBin('npx');
   const caffeinate = findBin('caffeinate');

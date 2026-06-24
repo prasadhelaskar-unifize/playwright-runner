@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 const VALID_BRANCH    = /^[a-zA-Z0-9._\-/]+$/;
 const VALID_ENV       = ['prod', 'staging'];
 const VALID_REPORTERS = ['default', 'line', 'dot', 'list'];
+const VALID_PDF_FLAGS = ['STITCH_PDF', 'STITCH_PDF_ONLY', 'HIGHLIGHT_ONLY'];
 
 function assertString(v, maxLen = 500) {
   if (typeof v !== 'string' || v.length > maxLen) throw new Error('Invalid string input');
@@ -41,7 +42,12 @@ contextBridge.exposeInMainWorld('api', {
   },
   specs: {
     all:     () => ipcRenderer.invoke('specs:all'),
-    folders: () => ipcRenderer.invoke('specs:folders')
+    folders: () => ipcRenderer.invoke('specs:folders'),
+    tests:   (paths) => {
+      if (!Array.isArray(paths)) throw new Error('Invalid paths');
+      paths.forEach(p => assertPath(p));
+      return ipcRenderer.invoke('specs:tests', paths);
+    }
   },
   tests: {
     run: (cfg) => {
@@ -51,7 +57,7 @@ contextBridge.exposeInMainWorld('api', {
       if (!Array.isArray(cfg.specPaths) || cfg.specPaths.length === 0) throw new Error('No spec paths');
       cfg.specPaths.forEach(p => assertPath(p));
       const reporter = VALID_REPORTERS.includes(cfg.reporter) ? cfg.reporter : 'default';
-      return ipcRenderer.invoke('tests:run', {
+      const payload = {
         specPaths: cfg.specPaths,
         env:       cfg.env,
         headed:    !!cfg.headed,
@@ -59,7 +65,13 @@ contextBridge.exposeInMainWorld('api', {
         workers:   assertInt(cfg.workers, 1, 16),
         retries:   assertInt(cfg.retries, 0, 5),
         reporter
-      });
+      };
+      if (cfg.grep != null) payload.grep = assertString(cfg.grep, 5000);
+      if (cfg.pdfFlag != null) {
+        if (!VALID_PDF_FLAGS.includes(cfg.pdfFlag)) throw new Error('Invalid PDF flag');
+        payload.pdfFlag = cfg.pdfFlag;
+      }
+      return ipcRenderer.invoke('tests:run', payload);
     },
     stop:      ()   => ipcRenderer.invoke('tests:stop'),
     onOutput:  (cb) => ipcRenderer.on('tests:output', (_, d) => cb(d)),

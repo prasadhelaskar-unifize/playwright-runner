@@ -45,7 +45,7 @@
         <div class="wizard" id="wizard">
           <!-- Step 1 -->
           <div class="step active" id="step-1">
-            <div class="step-header"><span class="step-badge">1 / 6</span><h2>Environment</h2></div>
+            <div class="step-header"><span class="step-badge">1 / 7</span><h2>Environment</h2></div>
             <div class="option-group" id="env-options">
               <button class="option-btn active" data-value="prod"><span class="opt-title">Production</span><span class="opt-sub">app.unifize.com</span></button>
               <button class="option-btn" data-value="staging"><span class="opt-title">Staging</span><span class="opt-sub">staging.unifize.com</span></button>
@@ -54,7 +54,7 @@
           </div>
           <!-- Step 2 -->
           <div class="step" id="step-2">
-            <div class="step-header"><span class="step-badge">2 / 6</span><h2>Branch</h2><span class="current-branch-label" id="step2-current"></span></div>
+            <div class="step-header"><span class="step-badge">2 / 7</span><h2>Branch</h2><span class="current-branch-label" id="step2-current"></span></div>
             <div class="option-group" id="branch-options">
               <button class="option-btn" data-value="shenoy-CI-Branch"><span class="opt-title">shenoy-CI-Branch</span></button>
               <button class="option-btn" data-value="Prasad-CI"><span class="opt-title">Prasad-CI</span></button>
@@ -67,7 +67,7 @@
           <!-- Step 3 -->
           <div class="step" id="step-3">
             <div class="step-header">
-              <span class="step-badge">3 / 6</span>
+              <span class="step-badge">3 / 7</span>
               <h2>Module / Folder</h2>
               <span class="hint">Cmd+click to select multiple folders</span>
               <span class="folder-selection-badge" id="folder-selection-badge" style="display:none"></span>
@@ -83,7 +83,7 @@
           <!-- Step 4 -->
           <div class="step" id="step-4">
             <div class="step-header">
-              <span class="step-badge">4 / 6</span><h2>Spec Files</h2>
+              <span class="step-badge">4 / 7</span><h2>Spec Files</h2>
               <span class="hint">Double-click to select &amp; continue · Cmd+click multi-select</span>
             </div>
             <div class="search-wrap">
@@ -94,9 +94,34 @@
             <div class="spec-list" id="spec-list"></div>
             <div class="step-actions"><button class="btn-back" id="spec-back">← Back</button><button class="btn-next" id="spec-next">Next →</button></div>
           </div>
-          <!-- Step 5 -->
+          <!-- Step 5: Test Cases -->
           <div class="step" id="step-5">
-            <div class="step-header"><span class="step-badge">5 / 6</span><h2>Browser Mode</h2></div>
+            <div class="step-header">
+              <span class="step-badge">5 / 7</span>
+              <h2>Test Cases</h2>
+              <span class="hint">Cmd+click to multi-select</span>
+              <span class="tc-selection-badge" id="tc-selection-badge" style="display:none"></span>
+            </div>
+            <div class="search-wrap">
+              <span class="search-icon">🔍</span>
+              <input class="search-input" id="tc-search" type="text" placeholder="Search test cases…" autocomplete="off"/>
+              <button class="search-clear" id="tc-search-clear" style="display:none">✕</button>
+            </div>
+            <div class="tc-select-all-row">
+              <label class="tc-select-all-label">
+                <div class="tc-select-all-check" id="tc-select-all-check"></div>
+                <span>Select All</span>
+              </label>
+              <span class="tc-count-label" id="tc-count-label"></span>
+            </div>
+            <div class="tc-list" id="tc-list">
+              <div class="tc-loading">Loading…</div>
+            </div>
+            <div class="step-actions"><button class="btn-back" id="tc-back">← Back</button><button class="btn-next" id="tc-next">Next →</button></div>
+          </div>
+          <!-- Step 6: Browser Mode -->
+          <div class="step" id="step-6">
+            <div class="step-header"><span class="step-badge">6 / 7</span><h2>Browser Mode</h2></div>
             <div class="option-group" id="browser-options">
               <button class="option-btn active" data-value="headless"><span class="opt-title">Headless</span><span class="opt-sub">Faster, no visible window</span></button>
               <button class="option-btn" data-value="headed"><span class="opt-title">Headed</span><span class="opt-sub">Shows the browser</span></button>
@@ -104,9 +129,9 @@
             </div>
             <div class="step-actions"><button class="btn-back" id="browser-back">← Back</button><button class="btn-next" id="browser-next">Next →</button></div>
           </div>
-          <!-- Step 6 -->
-          <div class="step" id="step-6">
-            <div class="step-header"><span class="step-badge">6 / 6</span><h2>Workers &amp; Retries</h2></div>
+          <!-- Step 7: Workers & Retries -->
+          <div class="step" id="step-7">
+            <div class="step-header"><span class="step-badge">7 / 7</span><h2>Workers &amp; Retries</h2></div>
             <div class="two-col">
               <div><label class="field-label">Parallel Workers</label>
                 <div class="option-group" id="worker-options">
@@ -121,6 +146,23 @@
                   <button class="option-btn" data-value="1"><span class="opt-title">1</span><span class="opt-sub">Once</span></button>
                   <button class="option-btn" data-value="2"><span class="opt-title">2</span><span class="opt-sub">Twice</span></button>
                 </div>
+              </div>
+            </div>
+            <div class="flags-section">
+              <label class="field-label">PDF &amp; Highlight Flags <span class="flag-opt-tag">optional</span></label>
+              <div class="flags-group" id="pdf-flags">
+                <button class="flag-btn" data-flag="STITCH_PDF">
+                  <span class="flag-title">STITCH_PDF</span>
+                  <span class="flag-sub">Highlights + PDF</span>
+                </button>
+                <button class="flag-btn" data-flag="STITCH_PDF_ONLY">
+                  <span class="flag-title">STITCH_PDF_ONLY</span>
+                  <span class="flag-sub">PDF only</span>
+                </button>
+                <button class="flag-btn" data-flag="HIGHLIGHT_ONLY">
+                  <span class="flag-title">HIGHLIGHT_ONLY</span>
+                  <span class="flag-sub">Highlights only</span>
+                </button>
               </div>
             </div>
             <div class="caffeinate-row">

@@ -217,6 +217,8 @@
     <span class="badge">🖥 macOS 11+</span>
     <span class="badge">⚡ Apple Silicon &amp; Intel</span>
     <span class="badge">v1.0.0</span>
+    <span class="badge">🧪 Test case picker</span>
+    <span class="badge">🧾 PDF &amp; Highlight flags</span>
   </div>
 
   <div class="downloads">
@@ -300,7 +302,7 @@
 <section id="usage">
   <div class="wrap">
     <h2>How to use it</h2>
-    <p class="sub">Click <strong>Run Tests</strong> and step through the 6-step wizard.</p>
+    <p class="sub">Click <strong>Run Tests</strong> — if no test is running, the 7-step wizard opens automatically.</p>
     <div class="tbl-wrap">
       <table>
         <thead><tr><th>Step</th><th>What you choose</th></tr></thead>
@@ -308,13 +310,14 @@
           <tr><td>1 — Environment</td><td>Production (app.unifize.com) or Staging</td></tr>
           <tr><td>2 — Branch</td><td>Switch branch + auto-sync from upstream</td></tr>
           <tr><td>3 — Module / Folder</td><td>Universal search — finds folders <em>and</em> spec files</td></tr>
-          <tr><td>4 — Spec Files</td><td>Multi-select specs (Cmd+click), or double-click to select &amp; continue</td></tr>
-          <tr><td>5 — Browser Mode</td><td>Headless / Headed / Debug (Playwright inspector)</td></tr>
-          <tr><td>6 — Workers &amp; Retries</td><td>Parallel workers (1 / 2 / 4) and retry count (0 / 1 / 2)</td></tr>
+          <tr><td>4 — Spec Files</td><td>Multi-select specs (Cmd+click), double-click to select &amp; continue</td></tr>
+          <tr><td>5 — Test Cases</td><td>Select individual tests; search by name; skip/fixme tests disabled</td></tr>
+          <tr><td>6 — Browser Mode</td><td>Headless / Headed / Debug (Playwright inspector)</td></tr>
+          <tr><td>7 — Workers &amp; Retries</td><td>Parallel workers, retry count, and optional PDF/Highlight flags</td></tr>
         </tbody>
       </table>
     </div>
-    <div class="callout" style="border-left-color: var(--accent);"><strong style="color: var(--accent-h);">Tip:</strong> Double-click any option at any step to select it and jump to the next step automatically. Hit <strong>▶ Run Tests</strong> to stream live output, then <strong>Open Report →</strong> for the full HTML report.</div>
+    <div class="callout" style="border-left-color: var(--accent);"><strong style="color: var(--accent-h);">Tip:</strong> Double-click any option to select and jump forward automatically. At Step 5, all non-skip tests are selected by default — deselect or use Cmd+click to narrow down. Playwright's <code>--grep</code> is applied automatically when a subset is chosen.</div>
   </div>
 </section>
 
@@ -327,8 +330,11 @@
       <div class="feature"><div class="ico">🖥</div><h3>Native macOS app</h3><p>Installs like any .app and lives in your Applications folder.</p></div>
       <div class="feature"><div class="ico">🔀</div><h3>Branch switcher</h3><p>Fetch &amp; hard-reset to upstream in one click — no merge conflicts.</p></div>
       <div class="feature"><div class="ico">🔍</div><h3>Universal search</h3><p>Search folders and spec files by name in the same box.</p></div>
-      <div class="feature"><div class="ico">📺</div><h3>Live terminal</h3><p>Streams Playwright output in real time with full ANSI colour.</p></div>
+      <div class="feature"><div class="ico">🧪</div><h3>Test case picker</h3><p>Browse every test in a spec, select a subset, and Playwright's <code>--grep</code> is set automatically. Skip/fixme tests are always disabled.</p></div>
+      <div class="feature"><div class="ico">📺</div><h3>Live terminal</h3><p>Streams Playwright output in real time with full ANSI colour and an accurate live progress bar.</p></div>
       <div class="feature"><div class="ico">📋</div><h3>Report viewer</h3><p>Auto-finds and opens the latest Playwright HTML report in your browser.</p></div>
+      <div class="feature"><div class="ico">🧾</div><h3>PDF &amp; Highlight flags</h3><p>Toggle <code>STITCH_PDF</code>, <code>STITCH_PDF_ONLY</code>, or <code>HIGHLIGHT_ONLY</code> per run without touching any config file.</p></div>
+      <div class="feature"><div class="ico">↩</div><h3>Smart navigation</h3><p>Clicking Run Tests when idle always opens the wizard. Running state keeps you on the terminal.</p></div>
       <div class="feature"><div class="ico">🔁</div><h3>Change repo anytime</h3><p>Re-pick the playwright-tests folder from the sidebar whenever you need.</p></div>
     </div>
   </div>

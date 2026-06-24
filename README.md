@@ -10,10 +10,14 @@ A native macOS desktop app for running Playwright tests on the Unifize platform 
 - 📁 **Repo picker on first launch** — prompts you to locate the `playwright-tests` folder, saves it for future runs
 - 🔀 **Branch switcher** — fetch & hard-reset to upstream in one click (no merge conflicts)
 - 🔍 **Universal search** — search folders and spec files by name in the same box (Step 3)
-- ▶ **6-step wizard** — guided configuration for environment, branch, module, specs, browser mode, workers & retries
+- ▶ **7-step wizard** — guided configuration for environment, branch, module, specs, test cases, browser mode, workers & retries
+- 🧪 **Test case picker** — browse and select individual test cases within each spec; skipped/fixme tests are disabled by default
 - ⌨ **Double-click to advance** — double-click any option at any step to select and jump forward instantly
 - 📺 **Live terminal** — streams Playwright output in real time with ANSI colour support
+- 📊 **Progress bar** — per-test and per-spec live progress tracking, showing exact count when tests are filtered
 - 📋 **Report viewer** — auto-finds and opens the latest Playwright HTML report in your browser
+- 🧾 **PDF & Highlight flags** — optional `STITCH_PDF`, `STITCH_PDF_ONLY`, `HIGHLIGHT_ONLY` env flags per run
+- 🔁 **Smart navigation** — clicking Run Tests when idle always opens the wizard fresh; running state shows the terminal
 - 🔁 **Change Repo** — switch to a different repo folder anytime from the sidebar
 
 ---
@@ -22,7 +26,6 @@ A native macOS desktop app for running Playwright tests on the Unifize platform 
 
 These must already be installed on the machine **before** running the app:
 
-
 | Dependency                  | Install                                  |
 | --------------------------- | ---------------------------------------- |
 | Node.js + npm               | [https://nodejs.org](https://nodejs.org) |
@@ -30,19 +33,20 @@ These must already be installed on the machine **before** running the app:
 | Git                         | Pre-installed on macOS                   |
 | The `playwright-tests` repo | Cloned anywhere on your Mac              |
 
-
 ---
 
 ## Installation
 
 1. Download the DMG for your Mac:
-  - **Apple Silicon (M1/M2/M3):** `Unifize Test Runner-1.0.0-arm64.dmg`
-  - **Intel Mac:** `Unifize Test Runner-1.0.0.dmg`
+   - **Apple Silicon (M1/M2/M3):** `Unifize Test Runner-1.0.0-arm64.dmg`
+   - **Intel Mac:** `Unifize Test Runner-1.0.0.dmg`
 2. Open the DMG and drag **Unifize Test Runner** into your **Applications** folder.
 3. On first launch, macOS Gatekeeper may block the app (unsigned build).
-  To bypass: **right-click → Open → Open in Terminal** in the dialog.
-4. Use Command  ```xattr -dr com.apple.quarantine "Unifize Test Runner.app```
-5. On first launch, a folder picker appears — select your `playwright-tests` repo folder. The path is saved to `~/.unifize-test-runner.conf` and reused on every future launch.
+   To bypass: **right-click → Open → Open** in the dialog, or run once in Terminal:
+   ```
+   xattr -dr com.apple.quarantine "Unifize Test Runner.app"
+   ```
+4. On first launch, a folder picker appears — select your `playwright-tests` repo folder. The path is saved to `~/.unifize-test-runner.conf` and reused on every future launch.
 
 ---
 
@@ -50,9 +54,8 @@ These must already be installed on the machine **before** running the app:
 
 ### Run Tests
 
-1. Click **Run Tests** from the sidebar or Home screen
-2. Step through the 6-step wizard:
-
+1. Click **Run Tests** from the sidebar or Home screen — if no test is currently running, the wizard opens automatically
+2. Step through the 7-step wizard:
 
 | Step                      | What you choose                                                      |
 | ------------------------- | -------------------------------------------------------------------- |
@@ -60,14 +63,47 @@ These must already be installed on the machine **before** running the app:
 | **2 — Branch**            | Switch branch + auto-sync from upstream                              |
 | **3 — Module / Folder**   | Universal search — finds folders AND spec files                      |
 | **4 — Spec Files**        | Multi-select specs (Cmd+click), or double-click to select & continue |
-| **5 — Browser Mode**      | Headless / Headed / Debug (Playwright inspector)                     |
-| **6 — Workers & Retries** | Parallel workers (1 / 2 / 4) and retry count (0 / 1 / 2)             |
+| **5 — Test Cases**        | Select individual tests; search by name; skip/fixme disabled         |
+| **6 — Browser Mode**      | Headless / Headed / Debug (Playwright inspector)                     |
+| **7 — Workers & Retries** | Parallel workers (1 / 2 / 4), retry count (0 / 1 / 2), PDF flags    |
 
-
-1. Click **▶ Run Tests** — live output streams in the terminal panel
-2. Click **Open Report →** to view the full HTML report in your browser
+3. Click **▶ Run Tests** — live output streams in the terminal panel
+4. Click **Open Report →** to view the full HTML report in your browser
 
 > **Tip:** Double-click any option at any step to select it and jump to the next step automatically.
+
+---
+
+### Test Case Selection (Step 5)
+
+After selecting spec files, Step 5 shows every test case inside them:
+
+- **All non-skip tests are selected by default**
+- **Select All checkbox** at the top — checked when all selected, dash when partial, empty when none
+- **Click** a test → selects only that test (all others deselected)
+- **Cmd+click** → toggle a test in/out of the current selection
+- **Skip / fixme** tests appear greyed out and cannot be selected or run
+- **Search bar** filters the list by test name in real time
+- **Multiple spec files** → tests are grouped in collapsible accordions per spec (click header to expand/collapse)
+- When a subset is selected, Playwright runs with `--grep` automatically — the progress bar shows the correct filtered count
+
+---
+
+### PDF & Highlight Flags (Step 7)
+
+Optional environment flags at the bottom of the Workers & Retries step:
+
+| Flag              | Highlights | Stitched PDF |
+| ----------------- | ---------- | ------------ |
+| *(none)*          | ✗          | ✗            |
+| `STITCH_PDF`      | ✓          | ✓            |
+| `STITCH_PDF_ONLY` | ✗          | ✓            |
+| `HIGHLIGHT_ONLY`  | ✓          | ✗            |
+
+- None selected by default
+- Click once to select; click again to deselect
+- Selecting `STITCH_PDF` disables the other two (it already covers both)
+- The selected flag is added as `FLAG=1` to the Playwright environment and shown in the command preview
 
 ---
 
@@ -92,17 +128,15 @@ Available branches:
 
 The search box in **Module / Folder** searches both folders and spec files simultaneously:
 
-
-| What you type | What it finds                                                          |
-| ------------- | ---------------------------------------------------------------------- |
+| What you type | What it finds                                                           |
+| ------------- | ----------------------------------------------------------------------- |
 | `login`       | Folders named `login` + any spec file with `login` in the name or path |
-| `regression`  | All folders under `tests/regression`                                   |
-| `inbox`       | Any folder or spec containing `inbox`                                  |
-
+| `regression`  | All folders under `tests/regression`                                    |
+| `inbox`       | Any folder or spec containing `inbox`                                   |
 
 - **Single-click** a result → selects it
 - **Double-click a folder** → selects it and advances to Spec Files (Step 4)
-- **Double-click a spec file** → selects it and skips straight to Browser Mode (Step 5)
+- **Double-click a spec file** → selects it and advances to Test Cases (Step 5)
 
 Each result shows a tag badge — `all`, `folder`, or `spec` — so you know what type it is.
 
@@ -155,14 +189,15 @@ unifize-app/
 ├── main.js           # Electron main process
 │                     #   — repo picker & config
 │                     #   — git operations
-│                     #   — spec discovery
-│                     #   — test runner (npx playwright)
+│                     #   — spec & test-case discovery
+│                     #   — test runner (npx playwright + grep/flags)
 │                     #   — report finder & count parser
 ├── preload.js        # Secure IPC bridge between main and renderer
 ├── renderer/
-│   ├── index.html    # App UI structure
-│   ├── styles.css    # Dark theme styles
-│   └── app.js        # UI logic — wizard, search, terminal, summary, navigation
+│   ├── index.html    # App UI structure (7-step wizard)
+│   ├── styles.css    # Dark/light theme styles
+│   └── app.js        # UI logic — wizard, test case picker, search,
+│                     #            terminal, progress, summary, navigation
 ├── assets/
 │   └── icon.icns     # macOS app icon
 └── package.json      # App metadata + electron-builder config
@@ -187,13 +222,11 @@ To reset and re-pick the folder, either:
 
 ## Branches
 
-
 | Branch             | Owner   |
 | ------------------ | ------- |
 | `shenoy-CI-Branch` | Shenoy  |
 | `Prasad-CI`        | Prasad  |
 | `saransh-complete` | Saransh |
-
 
 ---
 
@@ -203,4 +236,3 @@ To reset and re-pick the folder, either:
 - The app lives at `~/unifize-app/` — **outside** the git repo — so branch switches in the repo never affect the app files.
 - Since the app is unsigned (no Apple Developer certificate), you may see a Gatekeeper warning on first launch. Right-click → Open to bypass it once — it won't ask again.
 - On first run, macOS may ask for keychain access for git credentials — click **Always Allow** so it doesn't prompt again.
-
