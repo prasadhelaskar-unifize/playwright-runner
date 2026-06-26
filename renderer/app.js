@@ -159,6 +159,7 @@ bindOptionGroup('branch-options',   () => document.getElementById('branch-next')
 
 // ── Wizard state ──────────────────────────────────────────
 let skipSpecStep    = false;
+let skipTestCases   = false;  // pinned "ALL" shortcuts run the whole set → no test-case picker
 let allSpecs        = [];
 let allFolders      = [];
 let selectedFolder  = '';
@@ -382,6 +383,7 @@ folderClear.addEventListener('click', () => {
 
 function handleFolderNext(path, isSpec, isAll) {
   directSpecPath = null;
+  skipTestCases  = false;
 
   // Direct spec pick from search
   if (isSpec) {
@@ -392,12 +394,15 @@ function handleFolderNext(path, isSpec, isAll) {
     return;
   }
 
-  // Pinned ALL shortcuts → skip spec step
+  // Pinned ALL shortcuts → run the whole set: skip both spec list and test-case picker
   if (isAll) {
-    skipSpecStep = true;
+    skipSpecStep  = true;
+    skipTestCases = true;
     selectedFolder = path;
     selectedFolders.clear();
-    showStep(5);
+    specTestData = [];      // empty → buildGrepPattern() returns null → run all tests
+    selectedTests.clear();
+    showStep(6);
     return;
   }
 
@@ -502,7 +507,7 @@ document.getElementById('spec-back').addEventListener('click', () => { directSpe
 
 // ── Step 6 (Browser) ─────────────────────────────────────
 document.getElementById('browser-next').addEventListener('click', () => showStep(7));
-document.getElementById('browser-back').addEventListener('click', () => showStep(5));
+document.getElementById('browser-back').addEventListener('click', () => showStep(skipTestCases ? 3 : 5));
 
 // ── Step 7 (Workers) ─────────────────────────────────────
 document.getElementById('workers-back').addEventListener('click', () => showStep(6));
