@@ -5,6 +5,7 @@
 // ── Execution state ───────────────────────────────────────
 let isRunning      = false;
 let lastRunConfig  = null; // saved on each run for re-run
+let runStartTime   = 0;    // timestamp of the most recent run start
 
 // ── Test case step state ──────────────────────────────────
 let resolvedSpecPaths = [];   // actual .spec.js paths for step 5
@@ -1060,7 +1061,34 @@ async function launchRun(config) {
       : exitCode === 0 ? 'All tests passed' : 'Some tests failed';
 
     window.api.notify(exitCode === 0 ? 'Tests Passed' : 'Tests Finished', notifyMsg);
+
+    const slackBranch2 = document.getElementById('currentBranch').textContent.replace(/^⎇\s*/, '').trim();
+    const slackCounts  = counts.total > 0 ? counts : {
+      passed:  Math.max(0, progressDone - progressFailed),
+      failed:  progressFailed,
+      skipped: 0,
+      flaky:   0,
+      total:   progressTotal
+    };
+    window.api.slack.send('finish', {
+      env,
+      branch:   slackBranch2,
+      duration: formatDuration(Date.now() - runStartTime),
+      passed:   slackCounts.passed,
+      failed:   slackCounts.failed,
+      skipped:  slackCounts.skipped,
+      flaky:    slackCounts.flaky,
+      exitCode
+    }).catch(() => {});
   });
+
+  runStartTime = Date.now();
+  const slackBranch = document.getElementById('currentBranch').textContent.replace(/^⎇\s*/, '').trim();
+  const slackMode   = debug ? 'Debug' : headed ? 'Headed' : 'Headless';
+  window.api.slack.send('start', {
+    env, branch: slackBranch, mode: slackMode,
+    specs: specPaths.length, workers, retries
+  }).catch(() => {});
 
   setRunning(true);
   await window.api.tests.run({ specPaths, env, headed, debug, workers, retries, grep, pdfFlag });
@@ -1240,6 +1268,13 @@ function renderSummaryBar({ passed, failed, skipped, flaky, total }, exitCode) {
 }
 
 // ── Helpers ───────────────────────────────────────────────
+function formatDuration(ms) {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60), r = s % 60;
+  return r > 0 ? `${m}m ${r}s` : `${m}m`;
+}
+
 function highlight(text, query) {
   if (!query) return escapeHtml(text);
   const idx = text.toLowerCase().indexOf(query.toLowerCase());
@@ -1250,3 +1285,4 @@ function highlight(text, query) {
 }
 function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 // ANSI conversion handled securely in main process via ansi-to-html (escapeXML: true)
+

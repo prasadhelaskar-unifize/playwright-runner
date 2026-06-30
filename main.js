@@ -1,8 +1,9 @@
 const { app, BrowserWindow, ipcMain, Notification, shell, dialog: electronDialog } = require('electron');
 const { spawn, execSync } = require('child_process');
-const path = require('path');
-const fs   = require('fs');
-const os   = require('os');
+const path  = require('path');
+const fs    = require('fs');
+const os    = require('os');
+const https = require('https');
 
 const UPSTREAM_URL = 'https://github.com/unifize/playwright-tests.git';
 const CONFIG_FILE  = path.join(os.homedir(), '.unifize-test-runner.conf');
@@ -423,6 +424,109 @@ ipcMain.handle('report:counts', () => {
     }
   }
   return null;
+});
+
+// ── Load .env (no package needed) ────────────────────────
+try {
+  fs.readFileSync(path.join(__dirname, '.env'), 'utf8')
+    .split('\n')
+    .forEach(line => {
+      const m = line.match(/^([\w]+)\s*=\s*(.+)$/);
+      if (m) process.env[m[1]] = m[2].trim();
+    });
+} catch {}
+
+// ── Slack notifications ───────────────────────────────────
+const SLACK_WEBHOOK = process.env.SLACK_WEBHOOK || '';
+
+function postToSlack(webhookUrl, payload) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify(payload);
+    const u    = new URL(webhookUrl);
+    const req  = https.request({
+      hostname: u.hostname, path: u.pathname + u.search,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+    }, res => { res.resume(); resolve(res.statusCode); });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+function attachment(color, blocks) {
+  return { attachments: [{ color, blocks }] };
+}
+
+function kv(label, value) {
+  return { type: 'mrkdwn', text: `*${label}*\n${value}` };
+}
+
+function buildStartPayload({ env, branch, mode, specs, workers, retries }) {
+  return attachment('#6366f1', [
+    { type: 'header', text: { type: 'plain_text', text: '🚀 Test Run Started', emoji: true } },
+    { type: 'divider' },
+    {
+      type: 'section',
+      fields: [
+        kv('Env',     env),
+        kv('Branch',  branch),
+        kv('Mode',    mode),
+        kv('Specs',   `${specs} file${specs !== 1 ? 's' : ''}`),
+        kv('Workers', workers),
+        kv('Retries', retries)
+      ]
+    }
+  ]);
+}
+
+function buildFinishPayload({ env, branch, duration, passed, failed, skipped, flaky, exitCode }) {
+  const ok    = exitCode === 0;
+  const color = ok ? '#22c55e' : '#ef4444';
+  const title = ok ? '✅ Tests Passed' : '❌ Tests Failed';
+
+  const parts = [];
+  if (passed  > 0) parts.push(`${passed} passed`);
+  if (failed  > 0) parts.push(`${failed} failed`);
+  if (skipped > 0) parts.push(`${skipped} skipped`);
+  if (flaky   > 0) parts.push(`${flaky} flaky`);
+  const results = parts.length ? parts.join('  ·  ') : (ok ? 'All passed' : 'Some failed');
+
+  return attachment(color, [
+    { type: 'header', text: { type: 'plain_text', text: title, emoji: true } },
+    { type: 'divider' },
+    {
+      type: 'section',
+      fields: [
+        kv('Env',      env),
+        kv('Branch',   branch),
+        kv('Duration', duration),
+        kv('Results',  results)
+      ]
+    }
+  ]);
+}
+
+function buildTestPayload() {
+  return attachment('#6366f1', [{
+    type: 'section',
+    text: { type: 'mrkdwn', text: '🔔 *Unifize Test Runner* — Slack notifications are working!' }
+  }]);
+}
+
+ipcMain.handle('slack:send', async (_, { type, data }) => {
+  const webhookUrl = SLACK_WEBHOOK;
+  if (!webhookUrl || webhookUrl === 'PASTE_YOUR_WEBHOOK_URL_HERE') return { skipped: true };
+  let payload;
+  if (type === 'start')        payload = buildStartPayload(data);
+  else if (type === 'finish')  payload = buildFinishPayload(data);
+  else                         payload = buildTestPayload();
+  try {
+    const statusCode = await postToSlack(webhookUrl, payload);
+    return { ok: statusCode === 200 };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 });
 
 // FIX 2: Safe ANSI→HTML conversion in main process using ansi-to-html

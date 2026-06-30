@@ -42,7 +42,8 @@
       "main.js",
       "preload.js",
       "renderer/**/*",
-      "assets/**/*"
+      "assets/**/*",
+      ".env"
     ],
     "directories": {
       "output": "dist"

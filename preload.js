@@ -88,5 +88,12 @@ contextBridge.exposeInMainWorld('api', {
   notify: (title, body) => ipcRenderer.invoke('notify', {
     title: assertString(title, 100),
     body:  assertString(body,  200)
-  })
+  }),
+  slack: {
+    send: (type, data) => {
+      const VALID_TYPES = ['start', 'finish'];
+      if (!VALID_TYPES.includes(type)) throw new Error('Invalid notification type');
+      return ipcRenderer.invoke('slack:send', { type, data: data || {} });
+    }
+  }
 });
