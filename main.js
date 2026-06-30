@@ -71,13 +71,60 @@ async function askForRepoDir() {
 }
 
 // ── PATH resolution for packaged .app ────────────────────────
+// A packaged Electron app launches from Finder with a bare PATH — it does NOT
+// inherit the PATH the user gets in their terminal. So tools installed via
+// nvm/fnm/volta/asdf/Homebrew/n are invisible. To work for EVERYONE regardless
+// of how they installed Node, we ask the user's own login shell for its PATH
+// (the same env where `npx playwright` already works for them).
+
+// 1) Ask the login+interactive shell for its PATH. This sources the files where
+//    version managers hook in (.zshrc/.bash_profile/etc). Cached after first run.
+let cachedShellPath = null;
+function loginShellPath() {
+  if (cachedShellPath !== null) return cachedShellPath;
+  try {
+    const shell = process.env.SHELL || '/bin/zsh';
+    const out = execSync(`'${shell}' -ilc 'printf "__PW_PATH__:%s" "$PATH"'`, {
+      encoding: 'utf8', timeout: 6000, stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const m = out.match(/__PW_PATH__:(.+)/);
+    cachedShellPath = m ? m[1].trim() : '';
+  } catch { cachedShellPath = ''; }
+  return cachedShellPath;
+}
+
+// 2) Cheap fallback: directly scan nvm version dirs in case the shell probe
+//    fails (e.g. unusual shell config) but nvm is present.
+function nvmBinDirs() {
+  const versionsDir = path.join(os.homedir(), '.nvm', 'versions', 'node');
+  try {
+    return fs.readdirSync(versionsDir)
+      .filter(v => /^v\d/.test(v))
+      .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
+      .map(v => path.join(versionsDir, v, 'bin'));
+  } catch { return []; }
+}
+
+// Ordered, de-duplicated list of directories to search for binaries / build PATH.
+function binSearchDirs() {
+  const shellDirs = loginShellPath().split(':').filter(Boolean);
+  const dirs = [
+    ...shellDirs,
+    '/usr/local/bin', '/opt/homebrew/bin', '/opt/homebrew/sbin',
+    '/usr/bin', '/bin',
+    `${os.homedir()}/.nvm/current/bin`,
+    ...nvmBinDirs(),
+  ];
+  return [...new Set(dirs)];
+}
+
 function resolveEnv() {
-  const extraPaths = ['/usr/local/bin', '/opt/homebrew/bin', '/opt/homebrew/sbin', '/usr/bin', '/bin'].join(':');
+  const extraPaths = binSearchDirs().join(':');
   return { ...process.env, PATH: `${extraPaths}:${process.env.PATH || ''}` };
 }
 
 function findBin(name) {
-  for (const dir of ['/usr/bin', '/bin', '/usr/local/bin', '/opt/homebrew/bin', `${os.homedir()}/.nvm/current/bin`]) {
+  for (const dir of binSearchDirs()) {
     const full = path.join(dir, name);
     if (fs.existsSync(full)) return full;
   }

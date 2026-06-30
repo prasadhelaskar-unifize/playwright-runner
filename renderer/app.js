@@ -4,6 +4,7 @@
 
 // ── Execution state ───────────────────────────────────────
 let isRunning      = false;
+let lastRunConfig  = null; // saved on each run for re-run
 
 // ── Test case step state ──────────────────────────────────
 let resolvedSpecPaths = [];   // actual .spec.js paths for step 5
@@ -991,25 +992,17 @@ tcClear.addEventListener('click', () => {
 });
 
 // ── Run Tests ─────────────────────────────────────────────
-document.getElementById('run-btn').addEventListener('click', async () => {
-  const env     = getSelected('env-options')     || 'prod';
-  const browser = getSelected('browser-options') || 'headless';
-  const workers = parseInt(getSelected('worker-options') || '2');
-  const retries = parseInt(getSelected('retry-options')  || '0');
 
-  let specPaths = directSpecPath ? [directSpecPath]
-    : skipSpecStep ? [selectedFolder]
-    : [...document.querySelectorAll('#spec-list .spec-item.selected')].map(r => r.dataset.path);
-
-  const grep = buildGrepPattern();
-  if (grep === '') return; // nothing selected in test case step
-
-  const selectedTcCount = getSelectedTcCount();
+async function launchRun(config) {
+  const { env, browser, workers, retries, specPaths, grep, pdfFlag, selectedTcCount, envLine, cmdLine } = config;
+  const headed = browser !== 'headless';
+  const debug  = browser === 'debug';
   const tcLabel = grep ? ` | ${selectedTcCount} test(s)` : '';
 
   document.getElementById('wizard').style.display = 'none';
   document.getElementById('terminal-panel').style.display = 'flex';
   document.getElementById('terminal-footer').style.display = 'none';
+  document.getElementById('rerun-btn').style.display = 'none';
   document.getElementById('stop-btn').style.display = 'inline-block';
   document.getElementById('terminal-title').textContent =
     `Running — ${env} | ${specPaths.length} spec(s) | ${workers} worker(s)${tcLabel}`;
@@ -1019,26 +1012,9 @@ document.getElementById('run-btn').addEventListener('click', async () => {
   window.api.tests.offOutput();
   window.api.tests.offDone();
 
-  // Initialise progress tracking for this run.
   // When grep is active the spec file counts are wrong (full file, not filtered),
   // so pass the actual selected test count so the bar starts correct.
   initProgress(specPaths, grep ? selectedTcCount : null);
-
-  // Show the exact command being run
-  const headed = browser !== 'headless';
-  const debug  = browser === 'debug';
-  const flagPart = selectedPdfFlag ? ` ${selectedPdfFlag}=1` : '';
-  const envLine = `PLAYWRIGHT_ENV=${env} EXECUTION_SETTINGS=1 HEADLESS=${headed ? 'false' : 'true'} WORKERS=${workers} RETRIES=${retries}${flagPart}`;
-  const cmdParts = ['caffeinate -i npx playwright test', ...specPaths];
-  if (headed || debug) cmdParts.push('--headed');
-  if (debug) cmdParts.push('--debug');
-  cmdParts.push(`--workers=${workers}`);
-  cmdParts.push(`--retries=${retries}`);
-  if (grep) {
-    const displayGrep = grep.length > 60 ? grep.slice(0, 60) + '…' : grep;
-    cmdParts.push(`--grep "${displayGrep}"`);
-  }
-  const cmdLine = cmdParts.join(' ');
 
   const cmdBlock = document.createElement('div');
   cmdBlock.className = 'cmd-preview';
@@ -1053,9 +1029,8 @@ document.getElementById('run-btn').addEventListener('click', async () => {
 
   window.api.tests.onOutput(async data => {
     fullLog += data;
-    processOutputChunk(data);   // update progress bar + spec chips in real time
+    processOutputChunk(data);
     const span = document.createElement('span');
-    // FIX 2: Use safe ansi-to-html via main process (escapeXML: true)
     span.innerHTML = await window.api.ansi.convert(data);
     output.appendChild(span);
     output.scrollTop = output.scrollHeight;
@@ -1063,20 +1038,16 @@ document.getElementById('run-btn').addEventListener('click', async () => {
 
   window.api.tests.onDone(async ({ exitCode }) => {
     setRunning(false);
-    // Delay so any remaining IPC output events (failure detail lines) flush first,
-    // then flip chips: failed ones stay red, running ones become passed.
     setTimeout(() => finaliseProgress(false), 300);
     document.getElementById('terminal-footer').style.display = 'flex';
+    document.getElementById('rerun-btn').style.display = 'inline-block';
     document.getElementById('stop-btn').style.display = 'none';
 
-    // Show loading state while report JSON is written
     const s = document.getElementById('run-summary');
     s.innerHTML = '<span class="chip chip-total">⏳ Reading results…</span>';
 
-    // Wait briefly for custom reporter to finish writing JSON
     await new Promise(r => setTimeout(r, 1500));
 
-    // Try report JSON first, fall back to log parsing
     let counts = await window.api.report.counts();
     if (!counts || counts.total === 0) {
       counts = parsePlaywrightCounts(fullLog);
@@ -1092,7 +1063,74 @@ document.getElementById('run-btn').addEventListener('click', async () => {
   });
 
   setRunning(true);
-  await window.api.tests.run({ specPaths, env, headed: browser !== 'headless', debug: browser === 'debug', workers, retries, grep: grep ?? undefined, pdfFlag: selectedPdfFlag ?? undefined });
+  await window.api.tests.run({ specPaths, env, headed, debug, workers, retries, grep, pdfFlag });
+}
+
+document.getElementById('run-btn').addEventListener('click', async () => {
+  const env     = getSelected('env-options')     || 'prod';
+  const browser = getSelected('browser-options') || 'headless';
+  const workers = parseInt(getSelected('worker-options') || '2');
+  const retries = parseInt(getSelected('retry-options')  || '0');
+
+  let specPaths = directSpecPath ? [directSpecPath]
+    : skipSpecStep ? [selectedFolder]
+    : [...document.querySelectorAll('#spec-list .spec-item.selected')].map(r => r.dataset.path);
+
+  const grep = buildGrepPattern();
+  if (grep === '') return; // nothing selected in test case step
+
+  const selectedTcCount = getSelectedTcCount();
+
+  const headed  = browser !== 'headless';
+  const debug   = browser === 'debug';
+  const flagPart = selectedPdfFlag ? ` ${selectedPdfFlag}=1` : '';
+  const envLine = `PLAYWRIGHT_ENV=${env} EXECUTION_SETTINGS=1 HEADLESS=${headed ? 'false' : 'true'} WORKERS=${workers} RETRIES=${retries}${flagPart}`;
+  const cmdParts = ['caffeinate -i npx playwright test', ...specPaths];
+  if (headed || debug) cmdParts.push('--headed');
+  if (debug) cmdParts.push('--debug');
+  cmdParts.push(`--workers=${workers}`);
+  cmdParts.push(`--retries=${retries}`);
+  if (grep) {
+    const displayGrep = grep.length > 60 ? grep.slice(0, 60) + '…' : grep;
+    cmdParts.push(`--grep "${displayGrep}"`);
+  }
+  const cmdLine = cmdParts.join(' ');
+
+  lastRunConfig = { env, browser, workers, retries, specPaths, grep: grep ?? undefined, pdfFlag: selectedPdfFlag ?? undefined, selectedTcCount, envLine, cmdLine };
+  await launchRun(lastRunConfig);
+});
+
+// ── Re-run flow ───────────────────────────────────────────
+document.getElementById('rerun-btn').addEventListener('click', () => {
+  if (!lastRunConfig) return;
+  const { env, browser, workers, retries, specPaths, grep, pdfFlag, selectedTcCount, envLine, cmdLine } = lastRunConfig;
+  const details = document.getElementById('rerun-details');
+  details.innerHTML = `
+    <div class="rerun-config-rows">
+      <div class="rerun-row"><span class="rerun-label">Environment</span><span class="rerun-val">${escapeHtml(env)}</span></div>
+      <div class="rerun-row"><span class="rerun-label">Specs</span><span class="rerun-val">${specPaths.length} file(s)</span></div>
+      ${grep ? `<div class="rerun-row"><span class="rerun-label">Test Cases</span><span class="rerun-val">${selectedTcCount} selected</span></div>` : ''}
+      <div class="rerun-row"><span class="rerun-label">Browser</span><span class="rerun-val">${escapeHtml(browser)}</span></div>
+      <div class="rerun-row"><span class="rerun-label">Workers</span><span class="rerun-val">${workers}</span></div>
+      <div class="rerun-row"><span class="rerun-label">Retries</span><span class="rerun-val">${retries}</span></div>
+      ${pdfFlag ? `<div class="rerun-row"><span class="rerun-label">PDF Flag</span><span class="rerun-val rerun-flag">${escapeHtml(pdfFlag)}</span></div>` : ''}
+    </div>
+    <div class="rerun-cmd-preview">
+      <div class="cmd-preview-label">▶ Command</div>
+      <div class="cmd-preview-env">${escapeHtml(envLine)} \\</div>
+      <div class="cmd-preview-cmd">${escapeHtml(cmdLine)}</div>
+    </div>
+  `;
+  document.getElementById('rerun-overlay').style.display = 'flex';
+});
+
+document.getElementById('rerun-cancel').addEventListener('click', () => {
+  document.getElementById('rerun-overlay').style.display = 'none';
+});
+
+document.getElementById('rerun-confirm').addEventListener('click', async () => {
+  document.getElementById('rerun-overlay').style.display = 'none';
+  if (lastRunConfig) await launchRun(lastRunConfig);
 });
 
 document.getElementById('stop-btn').addEventListener('click', async () => {
@@ -1101,6 +1139,7 @@ document.getElementById('stop-btn').addEventListener('click', async () => {
   finaliseProgress(true);   // hide bar + chips on manual stop
   document.getElementById('stop-btn').style.display = 'none';
   document.getElementById('terminal-footer').style.display = 'flex';
+  if (lastRunConfig) document.getElementById('rerun-btn').style.display = 'inline-block';
   document.getElementById('run-summary').innerHTML = '<span class="summary-fail">■ Stopped by user</span>';
 });
 document.getElementById('back-to-config').addEventListener('click', () => { window.api.tests.stop(); showWizard(); });

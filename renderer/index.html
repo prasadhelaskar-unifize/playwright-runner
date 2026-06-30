@@ -194,8 +194,20 @@
           <!-- Per-spec status chips -->
           <div class="spec-tracker" id="spec-tracker" style="display:none"></div>
           <div class="terminal" id="terminal-output"></div>
+          <!-- Re-run confirmation overlay -->
+          <div class="rerun-overlay" id="rerun-overlay" style="display:none">
+            <div class="rerun-card">
+              <div class="rerun-card-title">↺ Re-run with same settings?</div>
+              <div class="rerun-details" id="rerun-details"></div>
+              <div class="rerun-actions">
+                <button class="btn-rerun-cancel" id="rerun-cancel">✕ Cancel</button>
+                <button class="btn-rerun-confirm" id="rerun-confirm">▶ Run Again</button>
+              </div>
+            </div>
+          </div>
           <div class="terminal-footer" id="terminal-footer" style="display:none">
             <div id="run-summary"></div>
+            <button class="btn-rerun" id="rerun-btn" style="display:none">↺ Re-run</button>
             <button class="btn-report" id="open-report-btn">Open Report →</button>
           </div>
         </div>

@@ -167,7 +167,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .btn-run:hover { opacity: 0.85; }
 
 /* ── Terminal ── */
-.terminal-panel { display: flex; flex-direction: column; height: calc(100vh - 38px - 64px); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.terminal-panel { position: relative; display: flex; flex-direction: column; height: calc(100vh - 38px - 64px); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .terminal-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 600; }
 .terminal-actions { display: flex; gap: 8px; }
 .btn-stop { padding: 5px 12px; border-radius: 6px; background: var(--red); color: #fff; border: none; cursor: pointer; font-size: 12px; font-weight: 600; }
@@ -195,6 +195,25 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 
 .btn-report { padding: 7px 18px; border-radius: 8px; background: var(--accent); color: #fff; border: none; cursor: pointer; font-weight: 600; font-size: 13px; flex-shrink: 0; }
 .btn-report:hover { background: var(--accent-h); }
+.btn-rerun { padding: 7px 16px; border-radius: 8px; background: var(--surface2); color: var(--text); border: 1.5px solid var(--border); cursor: pointer; font-weight: 600; font-size: 13px; flex-shrink: 0; transition: border-color 0.15s, color 0.15s; }
+.btn-rerun:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Re-run overlay ── */
+.rerun-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 20; backdrop-filter: blur(3px); animation: fadein-overlay 0.15s ease-out; }
+@keyframes fadein-overlay { from { opacity: 0; } to { opacity: 1; } }
+.rerun-card { background: var(--surface); border: 1.5px solid var(--accent); border-radius: var(--radius); padding: 24px; width: 520px; max-width: calc(100% - 48px); display: flex; flex-direction: column; gap: 16px; box-shadow: 0 16px 48px rgba(0,0,0,0.5); }
+.rerun-card-title { font-size: 16px; font-weight: 700; color: var(--text); }
+.rerun-config-rows { display: flex; flex-direction: column; gap: 6px; }
+.rerun-row { display: flex; align-items: center; gap: 10px; }
+.rerun-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; width: 90px; flex-shrink: 0; }
+.rerun-val { font-size: 12px; color: var(--text); font-weight: 500; }
+.rerun-val.rerun-flag { font-family: 'SF Mono', 'Menlo', monospace; color: var(--accent-h); font-weight: 700; }
+.rerun-cmd-preview { background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.3); border-radius: 8px; padding: 12px 14px; font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px; }
+.rerun-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.btn-rerun-cancel { padding: 8px 18px; border-radius: 8px; background: transparent; color: var(--muted); border: 1px solid var(--border); cursor: pointer; font-size: 13px; transition: color 0.15s; }
+.btn-rerun-cancel:hover { color: var(--text); }
+.btn-rerun-confirm { padding: 8px 22px; border-radius: 8px; background: var(--green); color: #fff; border: none; cursor: pointer; font-weight: 700; font-size: 13px; }
+.btn-rerun-confirm:hover { opacity: 0.85; }
 
 /* ── Git view ── */
 .branch-list { display: flex; flex-direction: column; gap: 8px; max-width: 480px; margin-bottom: 20px; }
