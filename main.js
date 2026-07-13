@@ -144,6 +144,12 @@ function createWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false }
   });
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+
+  // Report renderer crashes / hangs to Slack.
+  mainWindow.webContents.on('render-process-gone', (_e, d) =>
+    reportErrorToSlack('renderer', 'render-process-gone', new Error(`reason=${d.reason} exitCode=${d.exitCode}`)));
+  mainWindow.webContents.on('unresponsive', () =>
+    reportErrorToSlack('renderer', 'unresponsive', new Error('Window became unresponsive')));
 }
 
 app.whenReady().then(async () => {
@@ -327,6 +333,11 @@ ipcMain.handle('tests:run', (_, { specPaths, env, headed, debug, workers, retrie
   runningProc.stdout.on('data', d => mainWindow?.webContents.send('tests:output', d.toString()));
   runningProc.stderr.on('data', d => mainWindow?.webContents.send('tests:output', d.toString()));
   runningProc.on('close', code => { runningProc = null; mainWindow?.webContents.send('tests:done', { exitCode: code }); });
+  runningProc.on('error', err => {
+    reportErrorToSlack('test-runner', 'spawn', err);
+    runningProc = null;
+    mainWindow?.webContents.send('tests:done', { exitCode: -1, error: err.message });
+  });
   runningProc.unref(); // don't block the app from quitting
   return { started: true };
 });
@@ -405,6 +416,7 @@ ipcMain.handle('report:counts', () => {
       const dataDir = path.join(base, d, r, 'playwright-report', 'data');
       if (!fs.existsSync(dataDir)) continue;
       let passed = 0, failed = 0, skipped = 0, flaky = 0;
+      const failedTests = [];
       for (const file of fs.readdirSync(dataDir)) {
         if (!file.endsWith('.json')) continue;
         try {
@@ -414,13 +426,18 @@ ipcMain.handle('report:counts', () => {
             if (!last) continue;
             if (t.outcome === 'flaky') flaky++;
             else if (last.status === 'passed') passed++;
-            else if (last.status === 'failed' || last.status === 'timedOut') failed++;
+            else if (last.status === 'failed' || last.status === 'timedOut') {
+              failed++;
+              // Build a readable title: "describe › ... › test title"
+              const chain = [...(t.path || []), t.title].filter(Boolean).join(' › ');
+              if (chain) failedTests.push(chain);
+            }
             else if (last.status === 'skipped') skipped++;
           }
         } catch {}
       }
       const total = passed + failed + skipped + flaky;
-      if (total > 0) return { passed, failed, skipped, flaky, total };
+      if (total > 0) return { passed, failed, skipped, flaky, total, failedTests };
     }
   }
   return null;
@@ -462,49 +479,78 @@ function kv(label, value) {
   return { type: 'mrkdwn', text: `*${label}*\n${value}` };
 }
 
-function buildStartPayload({ env, branch, mode, specs, workers, retries }) {
-  return attachment('#6366f1', [
-    { type: 'header', text: { type: 'plain_text', text: '🚀 Test Run Started', emoji: true } },
-    { type: 'divider' },
-    {
-      type: 'section',
-      fields: [
-        kv('Env',     env),
-        kv('Branch',  branch),
-        kv('Mode',    mode),
-        kv('Specs',   `${specs} file${specs !== 1 ? 's' : ''}`),
-        kv('Workers', workers),
-        kv('Retries', retries)
-      ]
-    }
-  ]);
+function specList(specNames) {
+  if (!Array.isArray(specNames) || !specNames.length) return null;
+  const MAX = 8;
+  const shown = specNames.slice(0, MAX).map(n => `\`${n}\``).join('  ');
+  const extra = specNames.length > MAX ? `  _+${specNames.length - MAX} more_` : '';
+  return {
+    type: 'section',
+    text: { type: 'mrkdwn', text: `*Specs*\n${shown}${extra}` }
+  };
 }
 
-function buildFinishPayload({ env, branch, duration, passed, failed, skipped, flaky, exitCode }) {
-  const ok    = exitCode === 0;
-  const color = ok ? '#22c55e' : '#ef4444';
-  const title = ok ? '✅ Tests Passed' : '❌ Tests Failed';
+function failList(failedTests) {
+  if (!Array.isArray(failedTests) || !failedTests.length) return null;
+  const MAX = 8;
+  const shown = failedTests.slice(0, MAX).map(t => `•  ${t}`).join('\n');
+  const extra = failedTests.length > MAX ? `\n_+${failedTests.length - MAX} more_` : '';
+  return {
+    type: 'section',
+    text: { type: 'mrkdwn', text: `*Failures*\n${shown}${extra}` }
+  };
+}
 
+function buildPayload(title, color, fields, specNames, failedTests) {
+  const blocks = [
+    { type: 'header', text: { type: 'plain_text', text: title, emoji: true } },
+    { type: 'divider' },
+    { type: 'section', fields: fields.map(([label, value]) => kv(label, value)) }
+  ];
+  const specs = specList(specNames);
+  if (specs) blocks.push(specs);
+  const fails = failList(failedTests);
+  if (fails) blocks.push(fails);
+  return attachment(color, blocks);
+}
+
+function buildStartPayload({ env, branch, mode, specNames, workers, retries }) {
+  return buildPayload('🚀 Test Run Started', '#6366f1', [
+    ['Env',     env],
+    ['Branch',  branch],
+    ['Mode',    mode],
+    ['Workers', `${workers}  ·  Retries: ${retries}`]
+  ], specNames);
+}
+
+function buildFinishPayload({ env, branch, duration, specNames, passed, failed, skipped, flaky, exitCode, failedTests }) {
+  const ok = exitCode === 0;
   const parts = [];
   if (passed  > 0) parts.push(`${passed} passed`);
   if (failed  > 0) parts.push(`${failed} failed`);
   if (skipped > 0) parts.push(`${skipped} skipped`);
   if (flaky   > 0) parts.push(`${flaky} flaky`);
-  const results = parts.length ? parts.join('  ·  ') : (ok ? 'All passed' : 'Some failed');
+  return buildPayload(
+    ok ? '✅ Tests Passed' : '❌ Tests Failed',
+    ok ? '#22c55e' : '#ef4444',
+    [
+      ['Env',      env],
+      ['Branch',   branch],
+      ['Duration', duration],
+      ['Results',  parts.length ? parts.join('  ·  ') : (ok ? 'All passed' : 'Some failed')]
+    ],
+    specNames,
+    ok ? null : failedTests
+  );
+}
 
-  return attachment(color, [
-    { type: 'header', text: { type: 'plain_text', text: title, emoji: true } },
-    { type: 'divider' },
-    {
-      type: 'section',
-      fields: [
-        kv('Env',      env),
-        kv('Branch',   branch),
-        kv('Duration', duration),
-        kv('Results',  results)
-      ]
-    }
-  ]);
+function buildStoppedPayload({ env, branch, ranFor, specNames }) {
+  return buildPayload('⏹ Test Run Stopped', '#f59e0b', [
+    ['Env',     env],
+    ['Branch',  branch],
+    ['Ran for', ranFor],
+    ['Status',  'Stopped by user']
+  ], specNames);
 }
 
 function buildTestPayload() {
@@ -514,13 +560,67 @@ function buildTestPayload() {
   }]);
 }
 
+// ── Error / exception reporting ───────────────────────────
+function buildErrorPayload({ source, context, message, stack }) {
+  const trace = (stack || message || 'Unknown error').toString().slice(0, 2600);
+  let version = '?';
+  try { version = app.getVersion(); } catch {}
+  return attachment('#ef4444', [
+    { type: 'header', text: { type: 'plain_text', text: '🛑 App Error', emoji: true } },
+    { type: 'divider' },
+    { type: 'section', fields: [
+      kv('Source',   source || 'main'),
+      kv('Where',    context || '—'),
+      kv('Version',  `v${version}`),
+      kv('Platform', `${process.platform} · ${process.arch}`)
+    ]},
+    { type: 'section', text: { type: 'mrkdwn', text: `*Message*\n\`${(message || 'Unknown error').toString().slice(0, 300)}\`` } },
+    { type: 'section', text: { type: 'mrkdwn', text: '*Trace*\n```' + trace + '```' } }
+  ]);
+}
+
+// Throttle identical errors so a crash loop can't flood Slack.
+const _errSeen = new Map();
+const ERR_MIN_INTERVAL = 10000; // ms between identical reports
+
+async function reportErrorToSlack(source, context, err) {
+  try {
+    const webhookUrl = SLACK_WEBHOOK;
+    if (!webhookUrl || webhookUrl === 'PASTE_YOUR_WEBHOOK_URL_HERE') return;
+    const message = err && err.message ? err.message : String(err);
+    const stack   = err && err.stack ? err.stack : '';
+    const sig = `${source}|${context}|${message}`;
+    const now = Date.now();
+    if (now - (_errSeen.get(sig) || 0) < ERR_MIN_INTERVAL) return;
+    _errSeen.set(sig, now);
+    if (_errSeen.size > 200) _errSeen.clear();
+    await postToSlack(webhookUrl, buildErrorPayload({ source, context, message, stack }));
+  } catch { /* never let error reporting throw */ }
+}
+
+// Renderer-side errors are forwarded here from the preload bridge.
+ipcMain.handle('slack:error', (_, { context, message, stack } = {}) => {
+  const err = new Error(typeof message === 'string' ? message : 'Renderer error');
+  if (typeof stack === 'string') err.stack = stack;
+  reportErrorToSlack('renderer', typeof context === 'string' ? context.slice(0, 100) : 'renderer', err);
+  return { ok: true };
+});
+
+// Main-process crash surfaces.
+process.on('uncaughtException', (err) => reportErrorToSlack('main', 'uncaughtException', err));
+process.on('unhandledRejection', (reason) =>
+  reportErrorToSlack('main', 'unhandledRejection', reason instanceof Error ? reason : new Error(String(reason))));
+app.on('child-process-gone', (_e, d) =>
+  reportErrorToSlack('main', 'child-process-gone', new Error(`type=${d.type} reason=${d.reason} exitCode=${d.exitCode}`)));
+
 ipcMain.handle('slack:send', async (_, { type, data }) => {
   const webhookUrl = SLACK_WEBHOOK;
   if (!webhookUrl || webhookUrl === 'PASTE_YOUR_WEBHOOK_URL_HERE') return { skipped: true };
   let payload;
-  if (type === 'start')        payload = buildStartPayload(data);
-  else if (type === 'finish')  payload = buildFinishPayload(data);
-  else                         payload = buildTestPayload();
+  if (type === 'start')          payload = buildStartPayload(data);
+  else if (type === 'finish')    payload = buildFinishPayload(data);
+  else if (type === 'stopped')   payload = buildStoppedPayload(data);
+  else                           payload = buildTestPayload();
   try {
     const statusCode = await postToSlack(webhookUrl, payload);
     return { ok: statusCode === 200 };

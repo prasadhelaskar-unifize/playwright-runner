@@ -91,9 +91,31 @@ contextBridge.exposeInMainWorld('api', {
   }),
   slack: {
     send: (type, data) => {
-      const VALID_TYPES = ['start', 'finish'];
+      const VALID_TYPES = ['start', 'finish', 'stopped'];
       if (!VALID_TYPES.includes(type)) throw new Error('Invalid notification type');
       return ipcRenderer.invoke('slack:send', { type, data: data || {} });
-    }
+    },
+    reportError: (context, err) =>
+      forwardError(context, err && err.message ? err.message : String(err), err && err.stack)
   }
+});
+
+// ── Renderer error reporting ──────────────────────────────
+// Forward uncaught renderer errors to the main process, which relays
+// them to Slack. Fire-and-forget; never let reporting throw.
+function forwardError(context, message, stack) {
+  try {
+    ipcRenderer.invoke('slack:error', {
+      context: String(context || 'renderer').slice(0, 100),
+      message: String(message || 'Unknown error').slice(0, 500),
+      stack:   String(stack || '').slice(0, 4000)
+    });
+  } catch { /* ignore */ }
+}
+
+window.addEventListener('error', (e) =>
+  forwardError('window.onerror', e.message || (e.error && e.error.message), e.error && e.error.stack));
+window.addEventListener('unhandledrejection', (e) => {
+  const r = e.reason;
+  forwardError('unhandledrejection', r && r.message ? r.message : String(r), r && r.stack);
 });

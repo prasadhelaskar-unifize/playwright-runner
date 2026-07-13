@@ -1070,24 +1070,28 @@ async function launchRun(config) {
       flaky:   0,
       total:   progressTotal
     };
+    const finishSpecNames = specPaths.map(p => p.split('/').pop().replace('.spec.js', ''));
     window.api.slack.send('finish', {
       env,
-      branch:   slackBranch2,
-      duration: formatDuration(Date.now() - runStartTime),
-      passed:   slackCounts.passed,
-      failed:   slackCounts.failed,
-      skipped:  slackCounts.skipped,
-      flaky:    slackCounts.flaky,
-      exitCode
+      branch:    slackBranch2,
+      duration:  formatDuration(Date.now() - runStartTime),
+      specNames: finishSpecNames,
+      passed:    slackCounts.passed,
+      failed:    slackCounts.failed,
+      skipped:   slackCounts.skipped,
+      flaky:     slackCounts.flaky,
+      exitCode,
+      failedTests: Array.isArray(counts.failedTests) ? counts.failedTests : []
     }).catch(() => {});
   });
 
   runStartTime = Date.now();
   const slackBranch = document.getElementById('currentBranch').textContent.replace(/^⎇\s*/, '').trim();
   const slackMode   = debug ? 'Debug' : headed ? 'Headed' : 'Headless';
+  const specNames = specPaths.map(p => p.split('/').pop().replace('.spec.js', ''));
   window.api.slack.send('start', {
     env, branch: slackBranch, mode: slackMode,
-    specs: specPaths.length, workers, retries
+    specNames, workers, retries
   }).catch(() => {});
 
   setRunning(true);
@@ -1169,6 +1173,18 @@ document.getElementById('stop-btn').addEventListener('click', async () => {
   document.getElementById('terminal-footer').style.display = 'flex';
   if (lastRunConfig) document.getElementById('rerun-btn').style.display = 'inline-block';
   document.getElementById('run-summary').innerHTML = '<span class="summary-fail">■ Stopped by user</span>';
+
+  if (lastRunConfig) {
+    const { env, specPaths } = lastRunConfig;
+    const stoppedBranch = document.getElementById('currentBranch').textContent.replace(/^⎇\s*/, '').trim();
+    const stoppedSpecs  = specPaths.map(p => p.split('/').pop().replace('.spec.js', ''));
+    window.api.slack.send('stopped', {
+      env,
+      branch:    stoppedBranch,
+      ranFor:    formatDuration(Date.now() - runStartTime),
+      specNames: stoppedSpecs
+    }).catch(() => {});
+  }
 });
 document.getElementById('back-to-config').addEventListener('click', () => { window.api.tests.stop(); showWizard(); });
 document.getElementById('open-report-btn').addEventListener('click', async () => { const p = await window.api.report.find(); if (p) window.api.report.open(p); });
