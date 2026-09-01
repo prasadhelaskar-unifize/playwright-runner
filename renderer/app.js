@@ -662,16 +662,16 @@ function parseProgressLine(line) {
     }
   }
 
-  // ── Custom reporter: [test-progress] passed|failed|timedOut tests/foo.spec.js
+  // ── Custom reporter: [test-progress] passed|failed|timedOut|skipped tests/foo.spec.js
   // Emitted by custom-reporter.js onTestEnd for every final test attempt.
   // Takes priority over [trace-screenshot-reporter] (which only fires on failure).
-  const tpM = clean.match(/^\[test-progress\]\s+(passed|failed|timedOut|interrupted)\s+(tests\/[^\s]+\.spec\.js)/);
+  const tpM = clean.match(/^\[test-progress\]\s+(passed|failed|timedOut|interrupted|skipped)\s+(tests\/[^\s]+\.spec\.js)/);
   if (tpM && progressMode !== 'standard') {
     progressMode = 'custom';
     progressDone = Math.min(progressDone + 1, progressTotal || Infinity);
     const tpStatus = tpM[1];
     const tpSpec   = tpM[2];
-    if (tpStatus !== 'passed') {
+    if (tpStatus !== 'passed' && tpStatus !== 'skipped') {
       progressFailed++;
       specTrackerMap[tpSpec] = 'failed';
     } else {
