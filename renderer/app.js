@@ -153,7 +153,7 @@ function getSelected(groupId) {
   return document.getElementById(groupId)?.querySelector('.option-btn.active')?.dataset.value ?? null;
 }
 
-bindOptionGroup('env-options',      () => showStep(2));
+bindOptionGroup('env-options',      () => { if (envStepValid()) showStep(2); });
 bindOptionGroup('browser-options',  () => showStep(7));
 bindOptionGroup('worker-options',   () => document.getElementById('run-btn').click());
 bindOptionGroup('retry-options',    () => document.getElementById('run-btn').click());
@@ -187,8 +187,91 @@ function showWizard() {
 }
 showWizard();
 
+// ── Custom environment ────────────────────────────────────
+// Hosts shown in the pre-run confirmation. Mirrors BASE_URL in each
+// support/envs/env.* file; `custom` comes from the input instead.
+const ENV_URLS = {
+  prod:     'https://app.unifize.com',
+  staging:  'https://staging.unifize.com',
+  govcloud: 'https://app.unifize.us',
+  preprod:  null,   // host still unset in env.preprod
+  shadow:   null,   // host still unset in env.shadow
+  testing:  'https://testing.unifize.com'
+};
+// Environments that point at a live production tenant.
+const PRODUCTION_ENVS = ['prod', 'govcloud'];
+
+let customUrl = '';
+
+// Mirrors support/utils/env/custom-env.js so the wizard rejects a bad host
+// before the run rather than after Playwright has already started.
+function normalizeCustomUrl(raw) {
+  const value = String(raw || '').trim();
+  if (!value) return { ok: false, error: 'Enter the environment URL' };
+  if (value.length > 200) return { ok: false, error: 'URL is too long (max 200 characters)' };
+  if (/[\s]/.test(value)) return { ok: false, error: 'URL must not contain spaces' };
+  let parsed;
+  try {
+    parsed = new URL(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(value) ? value : `https://${value}`);
+  } catch {
+    return { ok: false, error: 'Not a valid URL' };
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { ok: false, error: 'URL must start with http:// or https://' };
+  }
+  if (parsed.username || parsed.password) return { ok: false, error: 'URL must not contain credentials' };
+  if (parsed.search || parsed.hash) return { ok: false, error: 'URL must not contain ? or #' };
+  return { ok: true, value: `${parsed.origin}${parsed.pathname.replace(/\/+$/, '')}` };
+}
+
+function setCustomUrlError(message) {
+  const hint  = document.getElementById('custom-url-hint');
+  const input = document.getElementById('custom-url');
+  if (message) {
+    hint.textContent = message;
+    hint.classList.add('error');
+    input.classList.add('invalid');
+  } else {
+    hint.innerHTML = 'Written to <code>support/envs/env.custom</code> for this run, then cleared.';
+    hint.classList.remove('error');
+    input.classList.remove('invalid');
+  }
+}
+
+function syncCustomUrlRow() {
+  const isCustom = getSelected('env-options') === 'custom';
+  document.getElementById('custom-url-row').style.display = isCustom ? 'flex' : 'none';
+  if (isCustom) setTimeout(() => document.getElementById('custom-url').focus(), 50);
+  else setCustomUrlError('');
+}
+
+// Gate on leaving step 1: a custom run needs a usable URL.
+function envStepValid() {
+  if (getSelected('env-options') !== 'custom') return true;
+  const result = normalizeCustomUrl(document.getElementById('custom-url').value);
+  if (!result.ok) {
+    setCustomUrlError(result.error);
+    document.getElementById('custom-url').focus();
+    return false;
+  }
+  customUrl = result.value;
+  setCustomUrlError('');
+  return true;
+}
+
+// The host a run will actually hit, for the confirmation dialog.
+function envTargetUrl(env) {
+  return env === 'custom' ? customUrl : ENV_URLS[env];
+}
+
+document.getElementById('env-options').addEventListener('click', syncCustomUrlRow);
+document.getElementById('custom-url').addEventListener('input', () => setCustomUrlError(''));
+document.getElementById('custom-url').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && envStepValid()) showStep(2);
+});
+
 // ── Step 1 ────────────────────────────────────────────────
-document.getElementById('env-next').addEventListener('click', () => showStep(2));
+document.getElementById('env-next').addEventListener('click', () => { if (envStepValid()) showStep(2); });
 
 // ── Step 2 ────────────────────────────────────────────────
 document.getElementById('branch-next').addEventListener('click', async () => {
@@ -1073,6 +1156,7 @@ async function launchRun(config) {
     const finishSpecNames = specPaths.map(p => p.split('/').pop().replace('.spec.js', ''));
     window.api.slack.send('finish', {
       env,
+      url:       envTargetUrl(env),
       branch:    slackBranch2,
       duration:  formatDuration(Date.now() - runStartTime),
       specNames: finishSpecNames,
@@ -1090,12 +1174,24 @@ async function launchRun(config) {
   const slackMode   = debug ? 'Debug' : headed ? 'Headed' : 'Headless';
   const specNames = specPaths.map(p => p.split('/').pop().replace('.spec.js', ''));
   window.api.slack.send('start', {
-    env, branch: slackBranch, mode: slackMode,
+    env, url: envTargetUrl(env), branch: slackBranch, mode: slackMode,
     specNames, workers, retries
   }).catch(() => {});
 
   setRunning(true);
-  await window.api.tests.run({ specPaths, env, headed, debug, workers, retries, grep, pdfFlag });
+  const started = await window.api.tests.run({ specPaths, env, headed, debug, workers, retries, grep, pdfFlag, customUrl: config.customUrl });
+  // main refuses to spawn if the custom URL could not be written to env.custom
+  if (started && started.started === false) {
+    setRunning(false);
+    finaliseProgress(true);
+    document.getElementById('stop-btn').style.display = 'none';
+    document.getElementById('terminal-footer').style.display = 'flex';
+    const err = document.createElement('div');
+    err.className = 'target-warn';
+    err.textContent = `✕ ${started.error || 'Could not start the run.'}`;
+    output.appendChild(err);
+    document.getElementById('run-summary').innerHTML = '<span class="summary-fail">■ Not started</span>';
+  }
 }
 
 document.getElementById('run-btn').addEventListener('click', async () => {
@@ -1128,8 +1224,43 @@ document.getElementById('run-btn').addEventListener('click', async () => {
   }
   const cmdLine = cmdParts.join(' ');
 
-  lastRunConfig = { env, browser, workers, retries, specPaths, grep: grep ?? undefined, pdfFlag: selectedPdfFlag ?? undefined, selectedTcCount, envLine, cmdLine };
-  await launchRun(lastRunConfig);
+  lastRunConfig = { env, browser, workers, retries, specPaths, grep: grep ?? undefined, pdfFlag: selectedPdfFlag ?? undefined, selectedTcCount, envLine, cmdLine, customUrl: env === 'custom' ? customUrl : undefined };
+  showTargetConfirm(lastRunConfig);
+});
+
+// ── Pre-run target confirmation ───────────────────────────
+// Every run stops here first: the host is shown, and nothing spawns until
+// the user confirms it. Cheap insurance against firing a suite at the
+// wrong tenant — production especially.
+function showTargetConfirm(config) {
+  const { env, specPaths, browser, workers, retries, selectedTcCount, grep } = config;
+  const target = envTargetUrl(env);
+  const isProd = PRODUCTION_ENVS.includes(env);
+
+  document.getElementById('target-details').innerHTML = `
+    <div class="rerun-config-rows">
+      <div class="rerun-row"><span class="rerun-label">Environment</span><span class="rerun-val">${escapeHtml(env)}</span></div>
+      <div class="rerun-row"><span class="rerun-label">Target URL</span><span class="target-url">${
+        target ? escapeHtml(target) : '⚠ host not configured in the env file'
+      }</span></div>
+      <div class="rerun-row"><span class="rerun-label">Specs</span><span class="rerun-val">${specPaths.length} file(s)</span></div>
+      ${grep ? `<div class="rerun-row"><span class="rerun-label">Test Cases</span><span class="rerun-val">${selectedTcCount} selected</span></div>` : ''}
+      <div class="rerun-row"><span class="rerun-label">Browser</span><span class="rerun-val">${escapeHtml(browser)}</span></div>
+      <div class="rerun-row"><span class="rerun-label">Workers</span><span class="rerun-val">${workers}</span></div>
+      <div class="rerun-row"><span class="rerun-label">Retries</span><span class="rerun-val">${retries}</span></div>
+    </div>
+    ${isProd ? '<div class="target-warn">⚠ This is a live production tenant.</div>' : ''}
+  `;
+  document.getElementById('target-overlay').style.display = 'flex';
+}
+
+document.getElementById('target-cancel').addEventListener('click', () => {
+  document.getElementById('target-overlay').style.display = 'none';
+});
+
+document.getElementById('target-confirm').addEventListener('click', async () => {
+  document.getElementById('target-overlay').style.display = 'none';
+  if (lastRunConfig) await launchRun(lastRunConfig);
 });
 
 // ── Re-run flow ───────────────────────────────────────────
@@ -1140,6 +1271,9 @@ document.getElementById('rerun-btn').addEventListener('click', () => {
   details.innerHTML = `
     <div class="rerun-config-rows">
       <div class="rerun-row"><span class="rerun-label">Environment</span><span class="rerun-val">${escapeHtml(env)}</span></div>
+      <div class="rerun-row"><span class="rerun-label">Target URL</span><span class="target-url">${
+        envTargetUrl(env) ? escapeHtml(envTargetUrl(env)) : '⚠ host not configured in the env file'
+      }</span></div>
       <div class="rerun-row"><span class="rerun-label">Specs</span><span class="rerun-val">${specPaths.length} file(s)</span></div>
       ${grep ? `<div class="rerun-row"><span class="rerun-label">Test Cases</span><span class="rerun-val">${selectedTcCount} selected</span></div>` : ''}
       <div class="rerun-row"><span class="rerun-label">Browser</span><span class="rerun-val">${escapeHtml(browser)}</span></div>
@@ -1180,6 +1314,7 @@ document.getElementById('stop-btn').addEventListener('click', async () => {
     const stoppedSpecs  = specPaths.map(p => p.split('/').pop().replace('.spec.js', ''));
     window.api.slack.send('stopped', {
       env,
+      url:       envTargetUrl(env),
       branch:    stoppedBranch,
       ranFor:    formatDuration(Date.now() - runStartTime),
       specNames: stoppedSpecs

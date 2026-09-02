@@ -71,15 +71,6 @@ async function askForRepoDir() {
   }
 }
 
-// ── PATH resolution for packaged .app ────────────────────────
-// A packaged Electron app launches from Finder with a bare PATH — it does NOT
-// inherit the PATH the user gets in their terminal. So tools installed via
-// nvm/fnm/volta/asdf/Homebrew/n are invisible. To work for EVERYONE regardless
-// of how they installed Node, we ask the user's own login shell for its PATH
-// (the same env where `npx playwright` already works for them).
-
-// 1) Ask the login+interactive shell for its PATH. This sources the files where
-//    version managers hook in (.zshrc/.bash_profile/etc). Cached after first run.
 let cachedShellPath = null;
 function loginShellPath() {
   if (cachedShellPath !== null) return cachedShellPath;
@@ -290,7 +281,38 @@ ipcMain.handle('specs:tests', (_, specPaths) => {
   return results;
 });
 
-ipcMain.handle('tests:run', (_, { specPaths, env, headed, debug, workers, retries, reporter, grep, pdfFlag }) => {
+// ── Custom env (PLAYWRIGHT_ENV=custom) ────────────────────
+
+function loadCustomEnvWriter() {
+  const modPath = path.join(REPO_DIR, 'support', 'utils', 'env', 'custom-env.js');
+  if (!fs.existsSync(modPath)) {
+    throw new Error(
+      'This tests repo has no support/utils/env/custom-env.js — the Custom environment ' +
+      'needs a checkout that includes it.'
+    );
+  }
+  delete require.cache[require.resolve(modPath)];
+  return require(modPath);
+}
+
+let customEnvActive = false;
+
+function writeCustomEnvUrl(url) {
+  const written = loadCustomEnvWriter().setCustomUrl(url);
+  customEnvActive = true;
+  return written;
+}
+
+// Never throws: clearing is cleanup and must not mask a run's real outcome.
+function clearCustomEnvUrl() {
+  try { loadCustomEnvWriter().clearCustomUrl(); } catch { /* repo gone or changed */ }
+  customEnvActive = false;
+}
+
+// Quitting mid-run would otherwise leave a live URL behind in env.custom.
+app.on('before-quit', () => { if (customEnvActive) clearCustomEnvUrl(); });
+
+ipcMain.handle('tests:run', (_, { specPaths, env, headed, debug, workers, retries, reporter, grep, pdfFlag, customUrl }) => {
   // Validate each spec path is inside repo
   const safeSpecs = specPaths.map(p => {
     try { return path.relative(REPO_DIR, safeRepoPath(path.join(REPO_DIR, p))); }
@@ -320,6 +342,18 @@ ipcMain.handle('tests:run', (_, { specPaths, env, headed, debug, workers, retrie
   else if (pdfFlag === 'STITCH_PDF_ONLY') envVars.STITCH_PDF_ONLY = '1';
   else if (pdfFlag === 'HIGHLIGHT_ONLY')  envVars.HIGHLIGHT_ONLY  = '1';
 
+  // Custom env: stamp the URL into env.custom before Playwright loads the config.
+  // A failure here must abort the run — otherwise env-map throws on an empty
+  // BASE_URL and the user sees a confusing config error instead of the cause.
+  const isCustomEnv = envVars.PLAYWRIGHT_ENV === 'custom';
+  if (isCustomEnv) {
+    try {
+      writeCustomEnvUrl(customUrl);
+    } catch (err) {
+      return { started: false, error: `Could not set the custom environment URL: ${err.message}` };
+    }
+  }
+
   const npx = findBin('npx');
   const caffeinate = findBin('caffeinate');
 
@@ -332,10 +366,15 @@ ipcMain.handle('tests:run', (_, { specPaths, env, headed, debug, workers, retrie
   runningProc = spawn(cmd, args, { cwd: REPO_DIR, env: envVars, detached: true });
   runningProc.stdout.on('data', d => mainWindow?.webContents.send('tests:output', d.toString()));
   runningProc.stderr.on('data', d => mainWindow?.webContents.send('tests:output', d.toString()));
-  runningProc.on('close', code => { runningProc = null; mainWindow?.webContents.send('tests:done', { exitCode: code }); });
+  runningProc.on('close', code => {
+    runningProc = null;
+    if (isCustomEnv) clearCustomEnvUrl();
+    mainWindow?.webContents.send('tests:done', { exitCode: code });
+  });
   runningProc.on('error', err => {
     reportErrorToSlack('test-runner', 'spawn', err);
     runningProc = null;
+    if (isCustomEnv) clearCustomEnvUrl();
     mainWindow?.webContents.send('tests:done', { exitCode: -1, error: err.message });
   });
   runningProc.unref(); // don't block the app from quitting
@@ -479,6 +518,15 @@ function kv(label, value) {
   return { type: 'mrkdwn', text: `*${label}*\n${value}` };
 }
 
+// Slack mrkdwn treats & < > specially; the target URL is user-entered
+// for the custom env, so escape it and render it as code.
+function urlField(url) {
+  if (typeof url !== 'string' || !url.trim()) return null;
+  const safe = url.trim().slice(0, 200)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return ['Target', `\`${safe}\``];
+}
+
 function specList(specNames) {
   if (!Array.isArray(specNames) || !specNames.length) return null;
   const MAX = 8;
@@ -502,10 +550,12 @@ function failList(failedTests) {
 }
 
 function buildPayload(title, color, fields, specNames, failedTests) {
+  // urlField() returns null when no target URL is known — drop those rows.
+  const rows = fields.filter(Boolean);
   const blocks = [
     { type: 'header', text: { type: 'plain_text', text: title, emoji: true } },
     { type: 'divider' },
-    { type: 'section', fields: fields.map(([label, value]) => kv(label, value)) }
+    { type: 'section', fields: rows.map(([label, value]) => kv(label, value)) }
   ];
   const specs = specList(specNames);
   if (specs) blocks.push(specs);
@@ -514,16 +564,17 @@ function buildPayload(title, color, fields, specNames, failedTests) {
   return attachment(color, blocks);
 }
 
-function buildStartPayload({ env, branch, mode, specNames, workers, retries }) {
+function buildStartPayload({ env, branch, mode, specNames, workers, retries, url }) {
   return buildPayload('🚀 Test Run Started', '#6366f1', [
     ['Env',     env],
+    urlField(url),
     ['Branch',  branch],
     ['Mode',    mode],
     ['Workers', `${workers}  ·  Retries: ${retries}`]
   ], specNames);
 }
 
-function buildFinishPayload({ env, branch, duration, specNames, passed, failed, skipped, flaky, exitCode, failedTests }) {
+function buildFinishPayload({ env, branch, duration, specNames, passed, failed, skipped, flaky, exitCode, failedTests, url }) {
   const ok = exitCode === 0;
   const parts = [];
   if (passed  > 0) parts.push(`${passed} passed`);
@@ -535,6 +586,7 @@ function buildFinishPayload({ env, branch, duration, specNames, passed, failed, 
     ok ? '#22c55e' : '#ef4444',
     [
       ['Env',      env],
+      urlField(url),
       ['Branch',   branch],
       ['Duration', duration],
       ['Results',  parts.length ? parts.join('  ·  ') : (ok ? 'All passed' : 'Some failed')]
@@ -544,9 +596,10 @@ function buildFinishPayload({ env, branch, duration, specNames, passed, failed, 
   );
 }
 
-function buildStoppedPayload({ env, branch, ranFor, specNames }) {
+function buildStoppedPayload({ env, branch, ranFor, specNames, url }) {
   return buildPayload('⏹ Test Run Stopped', '#f59e0b', [
     ['Env',     env],
+    urlField(url),
     ['Branch',  branch],
     ['Ran for', ranFor],
     ['Status',  'Stopped by user']

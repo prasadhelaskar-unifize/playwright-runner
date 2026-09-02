@@ -2,7 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 // ── FIX 5: Input validation at the bridge boundary ───────────
 const VALID_BRANCH    = /^[a-zA-Z0-9._\-/]+$/;
-const VALID_ENV       = ['prod', 'staging'];
+const VALID_ENV       = ['prod', 'staging', 'govcloud', 'preprod', 'shadow', 'testing', 'custom'];
 const VALID_REPORTERS = ['default', 'line', 'dot', 'list'];
 const VALID_PDF_FLAGS = ['STITCH_PDF', 'STITCH_PDF_ONLY', 'HIGHLIGHT_ONLY'];
 
@@ -18,6 +18,24 @@ function assertBranch(b) {
 function assertEnv(e) {
   if (!VALID_ENV.includes(e)) throw new Error('Invalid env');
   return e;
+}
+// Sanity-check only. The authoritative validation lives in the tests repo
+// (support/utils/env/custom-env.js), which normalises the value it writes.
+function assertCustomUrl(u) {
+  assertString(u, 200);
+  const value = u.trim();
+  if (!value) throw new Error('Custom URL is empty');
+  if (/[\s\u0000-\u001f]/.test(value)) throw new Error('Invalid custom URL');
+  let parsed;
+  try {
+    parsed = new URL(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(value) ? value : `https://${value}`);
+  } catch {
+    throw new Error('Invalid custom URL');
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('Custom URL must be http or https');
+  }
+  return value;
 }
 function assertInt(n, min = 0, max = 16) {
   const i = parseInt(n);
@@ -66,6 +84,7 @@ contextBridge.exposeInMainWorld('api', {
         retries:   assertInt(cfg.retries, 0, 5),
         reporter
       };
+      if (cfg.env === 'custom') payload.customUrl = assertCustomUrl(cfg.customUrl);
       if (cfg.grep != null) payload.grep = assertString(cfg.grep, 5000);
       if (cfg.pdfFlag != null) {
         if (!VALID_PDF_FLAGS.includes(cfg.pdfFlag)) throw new Error('Invalid PDF flag');

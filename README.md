@@ -59,7 +59,7 @@ These must already be installed on the machine **before** running the app:
 
 | Step                      | What you choose                                                      |
 | ------------------------- | -------------------------------------------------------------------- |
-| **1 — Environment**       | `Production` (app.unifize.com) or `Staging`                          |
+| **1 — Environment**       | `Production`, `Staging`, `Gov Cloud`, `Pre-prod / QA`, `Shadow`, `Testing`, or `Custom` (enter any host) |
 | **2 — Branch**            | Switch branch + auto-sync from upstream                              |
 | **3 — Module / Folder**   | Universal search — finds folders AND spec files                      |
 | **4 — Spec Files**        | Multi-select specs (Cmd+click), or double-click to select & continue |

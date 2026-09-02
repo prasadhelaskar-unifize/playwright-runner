@@ -12,7 +12,7 @@ Source: [`embed.html`](embed.html)
 
 ## What it shows
 
-- The Unifize logo, app name, and a `v1.0.0 · macOS 11+` badge
+- The Unifize logo, app name, and a `v1.0.9 · macOS 11+` badge
 - Both download buttons — **Apple Silicon** and **Intel** — opening in a new tab
 - A **Learn more →** link back to the full landing page
 

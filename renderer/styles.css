@@ -83,6 +83,24 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .opt-title { font-weight: 600; font-size: 13px; }
 .opt-sub   { font-size: 11px; color: var(--muted); }
 
+/* ── Custom environment URL ── */
+.custom-url-row { display: flex; flex-direction: column; gap: 6px; margin: -12px 0 24px; }
+.custom-url-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.custom-url-input { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 11px 14px; color: var(--text); font-size: 13px; font-family: 'SF Mono', 'Menlo', monospace; outline: none; transition: border-color 0.15s; }
+.custom-url-input:focus { border-color: var(--accent); }
+.custom-url-input.invalid { border-color: var(--red); }
+.custom-url-input::placeholder { color: var(--muted); font-family: var(--font); }
+.custom-url-hint { font-size: 11px; color: var(--muted); }
+.custom-url-hint code { font-family: 'SF Mono', 'Menlo', monospace; font-size: 10.5px; }
+.custom-url-hint.error { color: var(--red); font-weight: 600; }
+
+/* ── Target confirmation ── */
+/* Same look as .rerun-overlay but fixed to the window: this one is opened
+   from the wizard, which is not the terminal panel's positioned box. */
+.confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 60; backdrop-filter: blur(3px); animation: fadein-overlay 0.15s ease-out; }
+.target-url { font-family: 'SF Mono', 'Menlo', monospace; font-size: 13px; font-weight: 700; color: var(--accent-h); word-break: break-all; }
+.target-warn { font-size: 12px; color: var(--red); font-weight: 600; }
+
 /* ── Search box ── */
 .search-wrap { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 9px 14px; margin-bottom: 12px; transition: border-color 0.15s; }
 .search-wrap:focus-within { border-color: var(--accent); }

@@ -49,6 +49,17 @@
             <div class="option-group" id="env-options">
               <button class="option-btn active" data-value="prod"><span class="opt-title">Production</span><span class="opt-sub">app.unifize.com</span></button>
               <button class="option-btn" data-value="staging"><span class="opt-title">Staging</span><span class="opt-sub">staging.unifize.com</span></button>
+              <button class="option-btn" data-value="govcloud"><span class="opt-title">Gov Cloud</span><span class="opt-sub">app.unifize.us</span></button>
+              <button class="option-btn" data-value="preprod"><span class="opt-title">Pre-prod / QA</span><span class="opt-sub">host not set in env.preprod</span></button>
+              <button class="option-btn" data-value="shadow"><span class="opt-title">Shadow</span><span class="opt-sub">per-customer domain</span></button>
+              <button class="option-btn" data-value="testing"><span class="opt-title">Testing</span><span class="opt-sub">testing.unifize.com</span></button>
+              <button class="option-btn" data-value="custom"><span class="opt-title">Custom</span><span class="opt-sub">enter any host</span></button>
+            </div>
+            <div class="custom-url-row" id="custom-url-row" style="display:none">
+              <label class="custom-url-label" for="custom-url">Custom environment URL</label>
+              <input class="custom-url-input" id="custom-url" type="text" spellcheck="false" autocomplete="off"
+                     placeholder="https://acme.unifize.com" />
+              <div class="custom-url-hint" id="custom-url-hint">Written to <code>support/envs/env.custom</code> for this run, then cleared.</div>
             </div>
             <div class="step-actions"><button class="btn-next" id="env-next">Next →</button></div>
           </div>
@@ -209,6 +220,21 @@
             <div id="run-summary"></div>
             <button class="btn-rerun" id="rerun-btn" style="display:none">↺ Re-run</button>
             <button class="btn-report" id="open-report-btn">Open Report →</button>
+          </div>
+        </div>
+
+        <!-- Target-URL confirmation, shown before every run.
+             Lives outside #terminal-panel: that panel is hidden while the
+             wizard is up, and a flex child of a display:none parent renders
+             nothing. position:fixed so it covers the window either way. -->
+        <div class="confirm-overlay" id="target-overlay" style="display:none">
+          <div class="rerun-card">
+            <div class="rerun-card-title">▶ Run against this environment?</div>
+            <div class="rerun-details" id="target-details"></div>
+            <div class="rerun-actions">
+              <button class="btn-rerun-cancel" id="target-cancel">✕ Cancel</button>
+              <button class="btn-rerun-confirm" id="target-confirm">▶ Confirm &amp; Run</button>
+            </div>
           </div>
         </div>
       </section>
